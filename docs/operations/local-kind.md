@@ -8,7 +8,7 @@ The local environment is disposable and isolated. The default workflow uses Kind
 make kind-e2e
 ```
 
-The target:
+The target builds the operator image, installs the committed Helm chart, and then:
 
 - creates the named `openbao-entity-operator` Kind cluster;
 - uses Kind's default CNI unless `KIND_CNI=cilium` is supplied;
@@ -42,7 +42,7 @@ Failed runs preserve the test namespace so status and logs remain available:
 kubectl --context kind-openbao-entity-operator get pods -A
 kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaoentities,openbaogroups,openbaogroupmemberships -n openbao-entity-operator-e2e
 kubectl --context kind-openbao-entity-operator describe openbaoentity/e2e-created -n openbao-entity-operator-e2e
-kubectl --context kind-openbao-entity-operator logs deployment/openbao-entity-operator-controller-manager -n openbao-entity-operator-system
+kubectl --context kind-openbao-entity-operator logs deployment/openbao-entity-operator -n openbao-entity-operator-system
 ```
 
 After inspection, remove only the retained E2E resources with the dependency-aware cleanup target:

@@ -9,7 +9,7 @@ OPENBAO_TOKEN_KEY=${OPENBAO_TOKEN_KEY:-token}
 TEST_NAMESPACE=${TEST_NAMESPACE:-openbao-entity-operator-e2e}
 OPENBAO_DEPLOYMENT=${OPENBAO_DEPLOYMENT:-openbao}
 OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-openbao-entity-operator-system}
-operator_deployment=${OPERATOR_DEPLOYMENT:-openbao-entity-operator-controller-manager}
+operator_deployment=${OPERATOR_DEPLOYMENT:-openbao-entity-operator}
 KEEP_TEST_RESOURCES=${KEEP_TEST_RESOURCES:-false}
 cleanup_script=${CLEANUP_SCRIPT:-hack/cleanup-kind-e2e.sh}
 

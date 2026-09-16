@@ -1,0 +1,83 @@
+image:
+  repository: ghcr.io/winrarr/openbao-entity-operator
+  tag: dev
+  # If set, digest takes precedence over tag.
+  digest: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+leaderElection: true
+enableHTTP2: false
+healthProbeBindAddress: ":8081"
+
+metrics:
+  enabled: true
+  secure: true
+  port: 8443
+  tls:
+    # Existing kubernetes.io/tls Secret used by the secure metrics server.
+    # When empty, controller-runtime generates a development certificate.
+    certificateSecret: ""
+  readerRole:
+    create: true
+    binding:
+      # The chart cannot safely infer the Prometheus service account.
+      create: false
+      serviceAccount:
+        name: ""
+        namespace: ""
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: false
+    labels: {}
+    annotations: {}
+    # Set to an empty string when providing another authorization mechanism.
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      # Controller-runtime's generated certificate is intended for development.
+      insecureSkipVerify: true
+    relabelings: []
+    metricRelabelings: []
+    endpointAdditionalProperties: {}
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+
+serviceAccount:
+  create: true
+  # If empty and create=true, the release name is used.
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+priorityClassName: ""
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+env: []
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []

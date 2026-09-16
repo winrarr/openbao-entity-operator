@@ -80,14 +80,44 @@ spec:
 
 Membership resources manage only their claimed relationship. Existing remote memberships that are not claimed remain untouched, and deleting a membership claim removes its relationship without deleting the group or entity.
 
-## Install from a checkout
+## Install
+
+### Published chart
+
+Once a release is published, install the OCI chart with:
+
+```sh
+helm upgrade --install openbao-entity-operator \
+  oci://ghcr.io/winrarr/charts/openbao-entity-operator \
+  --version <chart-version> \
+  --namespace openbao-entity-operator-system \
+  --create-namespace
+```
+
+### From a checkout
+
+The Helm chart is the supported configurable installation surface:
+
+```sh
+helm upgrade --install openbao-entity-operator \
+  charts/openbao-entity-operator \
+  --namespace openbao-entity-operator-system \
+  --create-namespace
+```
+
+The chart packages the CRDs and generated controller permissions. See the
+[chart README](charts/openbao-entity-operator/README.md) for image, metrics,
+and Prometheus ServiceMonitor values.
+
+The generated Kustomize bundle remains available when a standalone manifest is
+preferred:
 
 ```sh
 make build-installer
 kubectl apply -f dist/install.yaml
 ```
 
-For local development, `make run` uses the active kubeconfig context. Build an image with `make docker-build IMG=...`, publish it with `make docker-push IMG=...`, and render an install bundle for that image with `make build-installer IMG=...`.
+For local development, `make run` uses the active kubeconfig context. Build an image with `make docker-build IMG=...`, publish it with `make docker-push IMG=...`, package the chart with `make helm-package`, and render an install bundle for that image with `make build-installer IMG=...`. `make deploy` installs or upgrades the Helm release in the active context.
 
 ## Development
 
@@ -97,7 +127,7 @@ make kind-e2e
 make kind-down
 ```
 
-`make check` regenerates CRDs, deepcopy code, and the CRD API reference, checks formatting, runs vet and unit tests, runs lint, validates the checked-in OpenBao OpenAPI reference, renders the installation manifests, and builds the strict documentation site. `make kind-e2e` builds the operator and tests the live OpenBao lifecycle in an isolated Kind cluster. See [the documentation map](docs/index.md) for product scope, design stories, architecture, operations, research, and verification details. Repository operating rules live in [AGENTS.md](AGENTS.md).
+`make check` regenerates CRDs, deepcopy code, chart assets, and the CRD API reference, checks formatting, runs vet and unit tests, runs lint and Helm chart checks, validates the checked-in OpenBao OpenAPI reference, renders the installation manifests, and builds the strict documentation site. `make kind-e2e` builds the operator, installs its Helm chart, and tests the live OpenBao lifecycle in an isolated Kind cluster. See [the documentation map](docs/index.md) for product scope, design stories, architecture, operations, research, and verification details. Repository operating rules live in [AGENTS.md](AGENTS.md).
 
 ## License
 

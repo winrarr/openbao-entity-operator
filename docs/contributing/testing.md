@@ -3,10 +3,10 @@
 The repository has three verification layers:
 
 - `make test` runs unit, fake-client reconciliation, and HTTP contract tests without external services.
-- `make check` adds generation, formatting, vet, lint, OpenAPI validation, and Kustomize rendering.
+- `make check` adds generation, formatting, vet, lint, Helm chart lint/rendering, OpenAPI validation, and Kustomize rendering.
 - `make kind-e2e` runs the live OpenBao and Kubernetes scenarios in an isolated Kind cluster.
 
-The `Live Kind tests` workflow runs the same `make kind-e2e` target on pushes and pull requests. The Cilium variant remains a local opt-in because the default suite is focused on operator and OpenBao behavior rather than CNI policy enforcement.
+The `Live Kind tests` workflow runs the same `make kind-e2e` target on pushes and pull requests. It installs the operator through the committed Helm chart. The Cilium variant remains a local opt-in because the default suite is focused on operator and OpenBao behavior rather than CNI policy enforcement.
 
 The `Tests` and `Lint` workflows run the non-live checks on pushes and pull requests. The `Docs` workflow generates the CRD reference and performs the strict site build; pushes to `main` publish the resulting site to GitHub Pages. Workflows cancel superseded runs for the same branch or pull request.
 

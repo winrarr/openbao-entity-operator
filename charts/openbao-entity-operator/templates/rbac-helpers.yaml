@@ -1,0 +1,135 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openbao-entity-operator.fullname" . }}-openbao-openbaoconnection-admin-role
+  labels:
+{{ include "openbao-entity-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections
+  verbs:
+  - '*'
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openbao-entity-operator.fullname" . }}-openbao-openbaoconnection-editor-role
+  labels:
+{{ include "openbao-entity-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openbao-entity-operator.fullname" . }}-openbao-openbaoconnection-viewer-role
+  labels:
+{{ include "openbao-entity-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openbao-entity-operator.fullname" . }}-openbao-openbaoentity-admin-role
+  labels:
+{{ include "openbao-entity-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoentities
+  verbs:
+  - '*'
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoentities/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openbao-entity-operator.fullname" . }}-openbao-openbaoentity-editor-role
+  labels:
+{{ include "openbao-entity-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoentities
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoentities/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openbao-entity-operator.fullname" . }}-openbao-openbaoentity-viewer-role
+  labels:
+{{ include "openbao-entity-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoentities
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoentities/status
+  verbs:
+  - get

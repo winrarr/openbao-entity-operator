@@ -5,7 +5,7 @@ SHELL := /usr/bin/env bash
 PROJECT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 LOCALBIN ?= $(PROJECT_DIR)/bin
 
-IMG ?= ghcr.io/rkthtrifork/openbao-entity-operator:dev
+IMG ?= ghcr.io/winrarr/openbao-entity-operator:dev
 CONTAINER_TOOL ?= docker
 DOCS_CONTAINER_IMAGE ?= zensical/zensical:0.0.59
 DOCS_CONTAINER_MOUNTS = -v "$(PROJECT_DIR)":/docs
@@ -15,6 +15,11 @@ KUBECTL_ARGS ?=
 KUBECTL_CMD = $(KUBECTL) $(KUBECTL_ARGS)
 KIND ?= $(shell command -v kind 2>/dev/null || echo $(LOCALBIN)/kind)
 HELM ?= helm
+HELM_ARGS ?=
+HELM_CMD = $(HELM) $(HELM_ARGS)
+PROJECT_NAME ?= openbao-entity-operator
+CHART_DIR ?= charts/openbao-entity-operator
+CHART_PACKAGE_DIR ?= dist
 KIND_CLUSTER ?= openbao-entity-operator
 KIND_CNI ?= default
 KIND_NODE_IMAGE ?= kindest/node:v1.34.2
@@ -70,11 +75,17 @@ generate: controller-gen crd-ref-docs ## Generate Go and documentation artifacts
 .PHONY: manifests
 manifests: controller-gen ## Generate CRDs and RBAC from API and controller markers.
 	"$(CONTROLLER_GEN)" rbac:roleName=manager-role crd paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(MAKE) sync-chart-generated
+
+.PHONY: sync-chart-generated
+sync-chart-generated: ## Sync generated CRDs and manager RBAC to the Helm chart.
+	./hack/sync-chart-crds.sh
+	./hack/sync-chart-rbac.sh
 
 .PHONY: verify-generated
 verify-generated: manifests generate ## Verify generated files are current in a tracked checkout.
 	@if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
-		git diff --exit-code -- api/openbao/v1alpha1/zz_generated.deepcopy.go config/crd/bases config/rbac/role.yaml docs/reference/api.md; \
+		git diff --exit-code -- api/openbao/v1alpha1/zz_generated.deepcopy.go config/crd/bases config/rbac/role.yaml charts/$(PROJECT_NAME)/crds charts/$(PROJECT_NAME)/templates/clusterrole.yaml charts/$(PROJECT_NAME)/templates/rbac-helpers.yaml docs/reference/api.md; \
 	else \
 		echo "No Git checkout detected; generated files were regenerated but cannot be compared"; \
 	fi
@@ -94,6 +105,14 @@ lint-config: golangci-lint ## Validate the linter configuration.
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint.
 	"$(GOLANGCI_LINT)" run
+
+.PHONY: helm-lint
+helm-lint: ## Lint the operator Helm chart.
+	$(HELM) lint $(CHART_DIR)
+
+.PHONY: helm-template
+helm-template: ## Render the operator Helm chart.
+	$(HELM) template $(PROJECT_NAME) $(CHART_DIR) --namespace $(OPERATOR_NAMESPACE) --include-crds >/dev/null
 
 .PHONY: openapi-check
 openapi-check: ## Validate the checked-in OpenBao OpenAPI reference.
@@ -135,7 +154,7 @@ docs-serve: generate-api-reference ## Generate and serve the documentation site 
 	$(CONTAINER_TOOL) run --rm --workdir /docs -p 8000:8000 $(DOCS_CONTAINER_MOUNTS) $(DOCS_CONTAINER_IMAGE) serve --dev-addr 0.0.0.0:8000 --config-file $(DOCS_CONFIG)
 
 .PHONY: check
-check: manifests generate format-check shell-check vet test lint-config lint openapi-check kustomize-build docs-build ## Run the complete local verification suite.
+check: manifests generate format-check shell-check vet test lint-config lint helm-lint helm-template openapi-check kustomize-build docs-build ## Run the complete local verification suite.
 
 ##@ Build
 
@@ -161,6 +180,11 @@ build-installer: manifests generate kustomize ## Build a standalone Kustomize in
 	@mkdir -p dist
 	"$(KUSTOMIZE)" build config/default | sed 's#image: controller:latest#image: $(IMG)#' > dist/install.yaml
 
+.PHONY: helm-package
+helm-package: manifests helm-lint ## Package the operator Helm chart.
+	@mkdir -p "$(CHART_PACKAGE_DIR)"
+	"$(HELM)" package "$(CHART_DIR)" --destination "$(CHART_PACKAGE_DIR)"
+
 ##@ Kubernetes deployment
 
 .PHONY: install
@@ -172,12 +196,37 @@ uninstall: manifests kustomize ## Remove CRDs from the current Kubernetes contex
 	"$(KUSTOMIZE)" build config/crd | $(KUBECTL_CMD) delete --ignore-not-found=true -f -
 
 .PHONY: deploy
-deploy: manifests kustomize ## Deploy the manager in the current Kubernetes context.
-	"$(KUSTOMIZE)" build config/default | sed 's#image: controller:latest#image: $(IMG)#' | $(KUBECTL_CMD) apply -f -
+deploy: manifests generate helm-lint ## Install or upgrade the operator Helm chart.
+	$(MAKE) helm-install
+
+.PHONY: helm-install
+helm-install: helm-lint ## Install or upgrade the operator Helm chart.
+	IMG_REF="$(IMG)"; \
+	if [[ "$$IMG_REF" == *@* ]]; then \
+		IMG_REPO="$${IMG_REF%@*}"; \
+		IMG_DIGEST="$${IMG_REF#*@}"; \
+		$(HELM_CMD) upgrade --install "$(PROJECT_NAME)" "$(CHART_DIR)" \
+			--namespace "$(OPERATOR_NAMESPACE)" --create-namespace \
+			--set-string "image.repository=$$IMG_REPO" --set-string "image.digest=$$IMG_DIGEST" --set-string image.tag="" \
+			--wait --timeout 5m; \
+	else \
+		IMG_LAST="$${IMG_REF##*/}"; \
+		if [[ "$$IMG_LAST" == *:* ]]; then \
+			IMG_REPO="$${IMG_REF%:*}"; \
+			IMG_TAG="$${IMG_REF##*:}"; \
+		else \
+			IMG_REPO="$$IMG_REF"; \
+			IMG_TAG="latest"; \
+		fi; \
+		$(HELM_CMD) upgrade --install "$(PROJECT_NAME)" "$(CHART_DIR)" \
+			--namespace "$(OPERATOR_NAMESPACE)" --create-namespace \
+			--set-string "image.repository=$$IMG_REPO" --set-string "image.tag=$$IMG_TAG" \
+			--wait --timeout 5m; \
+	fi
 
 .PHONY: undeploy
-undeploy: kustomize ## Remove the manager from the current Kubernetes context.
-	"$(KUSTOMIZE)" build config/default | $(KUBECTL_CMD) delete --ignore-not-found=true -f -
+undeploy: ## Uninstall the operator Helm release.
+	$(HELM_CMD) uninstall "$(PROJECT_NAME)" --namespace "$(OPERATOR_NAMESPACE)" --ignore-not-found
 
 ##@ Local Kind environment
 
@@ -274,7 +323,7 @@ kind-load-image: kind-create docker-build ## Load the operator image into Kind.
 kind-deploy: ## Build and deploy the operator into Kind.
 	$(MAKE) kind-up
 	$(MAKE) kind-load-image
-	$(MAKE) KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" install deploy
+	$(MAKE) KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" install deploy
 	$(MAKE) kind-restart
 
 .PHONY: kind-deploy-e2e
@@ -285,6 +334,7 @@ kind-e2e: ## Run the live OpenBao reconciliation workflow in Kind.
 	$(MAKE) kind-deploy-e2e
 	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
 		OPENBAO_TOKEN_SECRET="$(OPENBAO_TOKEN_SECRET)" OPENBAO_TOKEN_KEY="$(OPENBAO_TOKEN_KEY)" OPERATOR_NAMESPACE="$(OPERATOR_NAMESPACE)" \
+		OPERATOR_DEPLOYMENT="$(PROJECT_NAME)" \
 		./hack/e2e-kind.sh
 
 .PHONY: kind-e2e-clean
@@ -295,13 +345,13 @@ kind-e2e-clean: kind ## Remove only the failed live E2E test resources.
 kind-refresh: ## Rebuild and redeploy the operator in Kind.
 	$(MAKE) docker-build
 	$(MAKE) kind-load-image
-	$(MAKE) KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" deploy
+	$(MAKE) KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" deploy
 	$(MAKE) kind-restart
 
 .PHONY: kind-restart
 kind-restart: ## Restart the operator after loading a mutable local image tag.
-	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" -n "$(OPERATOR_NAMESPACE)" rollout restart deployment/openbao-entity-operator-controller-manager
-	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" -n "$(OPERATOR_NAMESPACE)" rollout status deployment/openbao-entity-operator-controller-manager --timeout=5m
+	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" -n "$(OPERATOR_NAMESPACE)" rollout restart deployment/$(PROJECT_NAME)
+	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" -n "$(OPERATOR_NAMESPACE)" rollout status deployment/$(PROJECT_NAME) --timeout=5m
 
 .PHONY: kind-down
 kind-down: kind ## Delete only the named disposable Kind cluster.

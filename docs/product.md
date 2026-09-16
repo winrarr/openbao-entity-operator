@@ -14,6 +14,7 @@ OpenBao Entity Operator lets a platform team declare OpenBao identity entities a
 - Create, adopt, update, observe, drift-correct, orphan, and opt-in delete behavior.
 - Desired metadata, ACL policy names, and disabled state.
 - Status conditions that distinguish dependencies, configuration, authentication, and external API failures.
+- Helm and generated Kustomize installation surfaces for the controller and CRDs.
 
 ## Non-goals for the first slice
 
