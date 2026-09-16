@@ -4,7 +4,7 @@
 
 This is a Go 1.27 Kubernetes operator for OpenBao ACL policies, identity entities, and groups. The public API in `api/openbao/v1alpha1` is the source of truth for the namespaced `OpenBaoConnection`, `OpenBaoPolicy`, `OpenBaoEntity`, `OpenBaoEntityAlias`, `OpenBaoGroup`, and `OpenBaoGroupMembership` CRDs.
 
-- `OpenBaoConnection` validates an OpenBao address and token Secret, then records health and authentication status.
+- `OpenBaoConnection` validates an OpenBao address and one supported authentication method (token Secret, Kubernetes Auth, or AppRole), then records health and authentication status.
 - `OpenBaoPolicy` reconciles a named OpenBao ACL policy document, including explicit creation/adoption, drift correction, and optional deletion.
 - `OpenBaoEntity` creates, adopts, updates, observes, and optionally deletes one OpenBao identity entity. The Kubernetes object name is the OpenBao entity name.
 - `OpenBaoEntityAlias` binds an auth-method mount accessor and alias name to a referenced entity, with explicit adoption and deletion policies.
@@ -60,6 +60,8 @@ make update-openbao-openapi OPENBAO_TOKEN=...  # Refresh from a running OpenBao 
 - `docs/backlog.md` contains real planned outcomes not implemented yet.
 - `docs/verification.md` explains what checks prove and what they do not prove.
 - `docs/operations/local-kind.md` documents the disposable Kind/OpenBao environment.
+- `docs/operations/approle.md` documents AppRole setup, credential rotation, and security boundaries.
+- `docs/reference/multi-tenancy.md` documents the current namespace-local trusted-platform model and its limits.
 - `docs/crds/` contains behavior-oriented guides for each public custom resource.
 - `docs/tech-debt.md` records material current limitations and their exit criteria.
 - `docs/decisions/0005-test-pyramid.md` defines the boundary between unit, HTTP contract, and live Kind tests.

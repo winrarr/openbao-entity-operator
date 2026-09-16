@@ -9,8 +9,9 @@ GitHub Container Registry.
 - permission to install CRDs, RBAC, and the operator deployment;
 - an OpenBao token policy or Kubernetes Auth role that grants the operations
   required by the resources you will manage;
-- a same-namespace Kubernetes Secret when using token authentication, or a
-  configured OpenBao Kubernetes Auth role when using Kubernetes Auth.
+- a same-namespace Kubernetes Secret when using token or AppRole authentication,
+  including the AppRole role ID and Secret ID, or a configured OpenBao
+  Kubernetes Auth role when using Kubernetes Auth.
 
 The operator does not install OpenBao, enable auth methods, configure
 TokenReview credentials, or create OpenBao roles and policies for its own

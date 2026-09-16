@@ -19,7 +19,9 @@ reconciliation loops.
 ## Find a task
 
 - [Connection patterns](reference/connection-patterns.md) — token Secrets,
-  Kubernetes Auth, OpenBao namespaces, and CA bundles.
+  Kubernetes Auth, AppRole, OpenBao namespaces, and CA bundles.
+- [Multi-tenancy](reference/multi-tenancy.md) — current namespace boundaries,
+  trusted-platform assumptions, and the future tenancy scope.
 - [Deletion and ownership](reference/deletion-and-ownership.md) — decide when
   an external OpenBao object should be deleted.
 - [Status and conditions](reference/status-and-conditions.md) — inspect

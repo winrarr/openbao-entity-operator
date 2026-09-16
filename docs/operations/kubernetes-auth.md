@@ -1,8 +1,8 @@
 # OpenBao Kubernetes Auth
 
-`OpenBaoConnection` supports either a same-namespace token Secret or OpenBao's
-Kubernetes Auth method. Kubernetes Auth is useful when the operator should not
-hold a long-lived OpenBao token Secret.
+`OpenBaoConnection` supports a same-namespace token Secret, OpenBao's
+Kubernetes Auth method, or AppRole. Kubernetes Auth is useful when the operator
+should not hold a long-lived OpenBao token Secret.
 
 ## OpenBao-side setup
 

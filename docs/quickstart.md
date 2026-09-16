@@ -61,6 +61,8 @@ kubectl wait --for=condition=Ready openbaoconnection/openbao --timeout=2m
 
 For in-cluster Kubernetes Auth, use the [Kubernetes Auth operations
 guide](operations/kubernetes-auth.md) instead of a static token Secret.
+For AppRole, use the [AppRole operations guide](operations/approle.md), which
+describes the two same-namespace credential Secrets.
 
 ## Declare a policy and entity
 

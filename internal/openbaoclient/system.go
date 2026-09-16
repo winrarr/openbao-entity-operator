@@ -79,6 +79,22 @@ func (c *Client) loginKubernetes(ctx context.Context, jwt string) (string, token
 	return response.Auth.ClientToken, newTokenLease(response.Auth, c.now()), nil
 }
 
+func (c *Client) loginAppRole(ctx context.Context, roleID, secretID string) (string, tokenLease, error) {
+	segments := append([]string{authPathSegment}, strings.Split(c.appRoleAuth.MountPath, "/")...)
+	segments = append(segments, "login")
+	var response tokenAuthResponse
+	if err := c.doSegmentsQueryWithToken(ctx, http.MethodPost, segments, nil, map[string]string{
+		"role_id":   roleID,
+		"secret_id": secretID,
+	}, &response, ""); err != nil {
+		return "", tokenLease{}, err
+	}
+	if strings.TrimSpace(response.Auth.ClientToken) == "" {
+		return "", tokenLease{}, fmt.Errorf("OpenBao AppRole auth response did not include a client token")
+	}
+	return response.Auth.ClientToken, newTokenLease(response.Auth, c.now()), nil
+}
+
 func (c *Client) renewToken(ctx context.Context, token string) (tokenLease, error) {
 	var response tokenAuthResponse
 	if err := c.doSegmentsQueryWithToken(ctx, http.MethodPost, []string{authPathSegment, "token", "renew-self"}, nil, map[string]string{

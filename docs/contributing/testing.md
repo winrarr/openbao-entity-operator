@@ -4,7 +4,7 @@ The repository has three verification layers with deliberately different jobs:
 
 - `make test` runs unit, fake-client reconciliation, and HTTP contract tests without external services. This is where almost all controller logic belongs: creation and adoption policy, drift, status, finalizers, dependency failures, and error handling.
 - `make check` adds generation, formatting, vet, lint, Helm chart lint/rendering, OpenAPI validation, and Kustomize rendering.
-- `make kind-e2e` runs a focused live smoke/integration path in an isolated Kind cluster: installation, CRDs/RBAC, Kubernetes Auth, and one successful policy/entity/alias/group-membership graph.
+- `make kind-e2e` runs a focused live smoke/integration path in an isolated Kind cluster: installation, CRDs/RBAC, Kubernetes Auth, AppRole, and one successful policy/entity/alias/group-membership graph.
 
 The live script is intentionally not a second controller test suite. Add a new
 E2E scenario only when it proves Kubernetes/OpenBao wiring or an external

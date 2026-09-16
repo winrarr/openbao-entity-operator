@@ -7,7 +7,7 @@ Kubernetes namespace. A connection contains:
 
 - the OpenBao API address;
 - an optional OpenBao namespace;
-- exactly one authentication method: a token Secret or Kubernetes Auth;
+- exactly one authentication method: a token Secret, Kubernetes Auth, or AppRole;
 - an optional CA bundle Secret; and
 - a per-request timeout.
 

@@ -63,14 +63,69 @@ spec:
                 minLength: 1
                 pattern: ^https?://
                 type: string
+              appRole:
+                description: |-
+                  AppRole logs the operator into OpenBao with an AppRole role ID and Secret ID
+                  read from same-namespace Secrets. The AppRole auth method and role must
+                  already be configured in OpenBao.
+                  Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured.
+                properties:
+                  mountPath:
+                    default: approle
+                    description: MountPath is the auth mount path without the leading
+                      auth/ prefix.
+                    pattern: ^[^/[:space:]]+([/][^/[:space:]]+)*$
+                    type: string
+                  roleIDSecretRef:
+                    description: |-
+                      RoleIDSecretRef references a same-namespace Secret containing the AppRole
+                      role ID. The key defaults to role-id.
+                    properties:
+                      key:
+                        description: |-
+                          Key is the Secret data key. Defaults depend on the referencing field:
+                          token for token references, role-id for AppRole role IDs, secret-id for
+                          AppRole Secret IDs, and ca.crt for CA bundle references.
+                        type: string
+                      name:
+                        description: Name is the Secret resource name.
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  secretIDSecretRef:
+                    description: |-
+                      SecretIDSecretRef references a same-namespace Secret containing the AppRole
+                      Secret ID. The key defaults to secret-id.
+                    properties:
+                      key:
+                        description: |-
+                          Key is the Secret data key. Defaults depend on the referencing field:
+                          token for token references, role-id for AppRole role IDs, secret-id for
+                          AppRole Secret IDs, and ca.crt for CA bundle references.
+                        type: string
+                      name:
+                        description: Name is the Secret resource name.
+                        minLength: 1
+                        type: string
+                    required:
+                    - name
+                    type: object
+                required:
+                - roleIDSecretRef
+                - secretIDSecretRef
+                type: object
               caBundleSecretRef:
                 description: |-
                   CABundleSecretRef optionally references a same-namespace Secret containing a PEM CA bundle.
                   The key defaults to ca.crt when omitted.
                 properties:
                   key:
-                    description: Key is the Secret data key. It defaults to token
-                      for token references.
+                    description: |-
+                      Key is the Secret data key. Defaults depend on the referencing field:
+                      token for token references, role-id for AppRole role IDs, secret-id for
+                      AppRole Secret IDs, and ca.crt for CA bundle references.
                     type: string
                   name:
                     description: Name is the Secret resource name.
@@ -84,7 +139,7 @@ spec:
                   KubernetesAuth logs the operator into OpenBao with its projected Kubernetes
                   ServiceAccount token. The Kubernetes auth method must already be enabled
                   and configured at the selected mount path.
-                  Exactly one of TokenSecretRef and KubernetesAuth must be configured.
+                  Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured.
                 properties:
                   mountPath:
                     default: kubernetes
@@ -119,11 +174,13 @@ spec:
               tokenSecretRef:
                 description: |-
                   TokenSecretRef references a same-namespace Secret containing an OpenBao token.
-                  Exactly one of TokenSecretRef and KubernetesAuth must be configured.
+                  Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured.
                 properties:
                   key:
-                    description: Key is the Secret data key. It defaults to token
-                      for token references.
+                    description: |-
+                      Key is the Secret data key. Defaults depend on the referencing field:
+                      token for token references, role-id for AppRole role IDs, secret-id for
+                      AppRole Secret IDs, and ca.crt for CA bundle references.
                     type: string
                   name:
                     description: Name is the Secret resource name.
@@ -136,8 +193,11 @@ spec:
             - address
             type: object
             x-kubernetes-validations:
-            - message: exactly one of tokenSecretRef or kubernetesAuth must be configured
-              rule: has(self.tokenSecretRef) != has(self.kubernetesAuth)
+            - message: exactly one of tokenSecretRef, kubernetesAuth, or appRole must
+                be configured
+              rule: (has(self.tokenSecretRef) && !has(self.kubernetesAuth) && !has(self.appRole))
+                || (!has(self.tokenSecretRef) && has(self.kubernetesAuth) && !has(self.appRole))
+                || (!has(self.tokenSecretRef) && !has(self.kubernetesAuth) && has(self.appRole))
           status:
             description: status defines the observed state of OpenBaoConnection
             properties:

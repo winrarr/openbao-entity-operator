@@ -6,7 +6,7 @@ OpenBao Entity Operator lets a platform team declare OpenBao ACL policies, ident
 
 ## Current scope
 
-- Same-namespace `OpenBaoConnection` resources with an address, optional OpenBao namespace, either a token Secret or Kubernetes Auth using the operator ServiceAccount, an optional CA bundle Secret, and request timeout.
+- Same-namespace `OpenBaoConnection` resources with an address, optional OpenBao namespace, exactly one of a token Secret, Kubernetes Auth using the operator ServiceAccount, or AppRole credentials, an optional CA bundle Secret, and request timeout.
 - Same-namespace `OpenBaoPolicy` resources whose Kubernetes name is the OpenBao ACL policy name and whose `spec.rules` is the raw HCL or JSON policy document.
 - Same-namespace `OpenBaoEntity` resources whose Kubernetes name is the OpenBao entity name.
 - Same-namespace `OpenBaoEntityAlias` resources that bind an auth-method alias name and mount accessor to an `OpenBaoEntity`.
@@ -16,6 +16,7 @@ OpenBao Entity Operator lets a platform team declare OpenBao ACL policies, ident
 - Desired policy documents, entity/group metadata, ACL policy names, and disabled state.
 - Status conditions that distinguish dependencies, configuration, authentication, and external API failures.
 - Helm and generated Kustomize installation surfaces for the controller and CRDs.
+- AppRole authentication using externally managed role ID and Secret ID Secrets.
 
 ## Non-goals for the first slice
 

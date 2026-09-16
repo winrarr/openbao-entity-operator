@@ -18,6 +18,25 @@ Package v1alpha1 contains API Schema definitions for the openbao v1alpha1 API gr
 
 
 
+#### AppRoleAuthSpec
+
+
+
+AppRoleAuthSpec defines how an OpenBaoConnection uses the AppRole auth
+method. Both credential references are reread when a new login is needed.
+
+
+
+_Appears in:_
+- [OpenBaoConnectionSpec](#openbaoconnectionspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `mountPath` _string_ | MountPath is the auth mount path without the leading auth/ prefix. | approle | Pattern: `^[^/[:space:]]+([/][^/[:space:]]+)*$` <br />Optional: \{\} <br /> |
+| `roleIDSecretRef` _[SecretKeyReference](#secretkeyreference)_ | RoleIDSecretRef references a same-namespace Secret containing the AppRole<br />role ID. The key defaults to role-id. |  |  |
+| `secretIDSecretRef` _[SecretKeyReference](#secretkeyreference)_ | SecretIDSecretRef references a same-namespace Secret containing the AppRole<br />Secret ID. The key defaults to secret-id. |  |  |
+
+
 #### CreationPolicy
 
 _Underlying type:_ _string_
@@ -130,8 +149,9 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `address` _string_ | Address is the OpenBao API address without the /v1 API prefix. |  | MinLength: 1 <br />Pattern: `^https?://` <br /> |
 | `namespace` _string_ | Namespace is an optional absolute or relative OpenBao namespace path.<br />An empty value targets the root namespace. The value is sent as the<br />X-Vault-Namespace request header. |  | Pattern: `^$\|^[^/[:space:]]+([/][^/[:space:]]+)*$` <br />Optional: \{\} <br /> |
-| `tokenSecretRef` _[SecretKeyReference](#secretkeyreference)_ | TokenSecretRef references a same-namespace Secret containing an OpenBao token.<br />Exactly one of TokenSecretRef and KubernetesAuth must be configured. |  | Optional: \{\} <br /> |
-| `kubernetesAuth` _[KubernetesAuthSpec](#kubernetesauthspec)_ | KubernetesAuth logs the operator into OpenBao with its projected Kubernetes<br />ServiceAccount token. The Kubernetes auth method must already be enabled<br />and configured at the selected mount path.<br />Exactly one of TokenSecretRef and KubernetesAuth must be configured. |  | Optional: \{\} <br /> |
+| `tokenSecretRef` _[SecretKeyReference](#secretkeyreference)_ | TokenSecretRef references a same-namespace Secret containing an OpenBao token.<br />Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured. |  | Optional: \{\} <br /> |
+| `kubernetesAuth` _[KubernetesAuthSpec](#kubernetesauthspec)_ | KubernetesAuth logs the operator into OpenBao with its projected Kubernetes<br />ServiceAccount token. The Kubernetes auth method must already be enabled<br />and configured at the selected mount path.<br />Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured. |  | Optional: \{\} <br /> |
+| `appRole` _[AppRoleAuthSpec](#approleauthspec)_ | AppRole logs the operator into OpenBao with an AppRole role ID and Secret ID<br />read from same-namespace Secrets. The AppRole auth method and role must<br />already be configured in OpenBao.<br />Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured. |  | Optional: \{\} <br /> |
 | `caBundleSecretRef` _[SecretKeyReference](#secretkeyreference)_ | CABundleSecretRef optionally references a same-namespace Secret containing a PEM CA bundle.<br />The key defaults to ca.crt when omitted. |  | Optional: \{\} <br /> |
 | `requestTimeout` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RequestTimeout bounds each request made to OpenBao. | 30s | Optional: \{\} <br /> |
 
@@ -389,9 +409,10 @@ SecretKeyReference identifies a key in a same-namespace Secret.
 
 
 _Appears in:_
+- [AppRoleAuthSpec](#approleauthspec)
 - [OpenBaoConnectionSpec](#openbaoconnectionspec)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `name` _string_ | Name is the Secret resource name. |  | MinLength: 1 <br /> |
-| `key` _string_ | Key is the Secret data key. It defaults to token for token references. |  | Optional: \{\} <br /> |
+| `key` _string_ | Key is the Secret data key. Defaults depend on the referencing field:<br />token for token references, role-id for AppRole role IDs, secret-id for<br />AppRole Secret IDs, and ca.crt for CA bundle references. |  | Optional: \{\} <br /> |

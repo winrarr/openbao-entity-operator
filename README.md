@@ -75,6 +75,11 @@ The client renews renewable auth tokens and performs one fresh login retry after
 OpenBao rejects a token. See the [Kubernetes Auth operations guide](docs/operations/kubernetes-auth.md)
 for the OpenBao-side setup and rotation considerations.
 
+When Kubernetes Auth is unavailable, the connection can use AppRole with
+separate same-namespace Secrets for the role ID and Secret ID. See the [AppRole
+operations guide](docs/operations/approle.md) for the credential lifecycle and
+rotation boundary.
+
 An `OpenBaoPolicy` uses its Kubernetes `metadata.name` as the OpenBao ACL policy
 name and sends the raw HCL or JSON document in `spec.rules` to OpenBao. Policies
 default to explicit creation and orphaning; use `creationPolicy: Adopt` when an
