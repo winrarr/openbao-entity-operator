@@ -11,6 +11,7 @@ OPENBAO_DEPLOYMENT=${OPENBAO_DEPLOYMENT:-openbao}
 OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-openbao-entity-operator-system}
 operator_deployment=${OPERATOR_DEPLOYMENT:-openbao-entity-operator-controller-manager}
 KEEP_TEST_RESOURCES=${KEEP_TEST_RESOURCES:-false}
+cleanup_script=${CLEANUP_SCRIPT:-hack/cleanup-kind-e2e.sh}
 
 kubectl_cmd() {
   "${KUBECTL}" --context="${KUBE_CONTEXT}" "$@"
@@ -22,7 +23,10 @@ cleanup() {
 		echo "Keeping ${TEST_NAMESPACE} for inspection (exit ${exit_code})" >&2
 		exit "${exit_code}"
 	fi
-	kubectl_cmd delete namespace "${TEST_NAMESPACE}" --ignore-not-found --wait=true --timeout=5m >/dev/null 2>&1 || true
+	if ! KUBECTL="${KUBECTL}" KUBE_CONTEXT="${KUBE_CONTEXT}" TEST_NAMESPACE="${TEST_NAMESPACE}" "${cleanup_script}"; then
+		echo "Failed to clean up ${TEST_NAMESPACE}; run make kind-e2e-clean to retry" >&2
+		exit 1
+	fi
 	exit "${exit_code}"
 }
 trap cleanup EXIT
@@ -70,6 +74,40 @@ wait_for_condition_reason() {
 openbao_cli() {
   kubectl_cmd -n "${OPENBAO_NAMESPACE}" exec "deployment/${OPENBAO_DEPLOYMENT}" -- \
     env BAO_ADDR=http://127.0.0.1:8200 bao "$@"
+}
+
+reset_remote_test_objects() {
+  local alias_id alias_name group_id group_name name
+  local alias_ids group_ids
+
+  alias_ids="$(openbao_cli list -format=json identity/entity-alias/id 2>/dev/null | jq -r '.data.keys[]?' || true)"
+  while IFS= read -r alias_id; do
+    [[ -n "${alias_id}" ]] || continue
+    alias_name="$(remote_alias "${alias_id}" 2>/dev/null | jq -r '.data.name // empty' || true)"
+    case "${alias_name}" in
+      e2e-login|e2e-adopt-login|e2e-conflict-login|e2e-orphan-login)
+        openbao_cli delete "identity/entity-alias/id/${alias_id}" >/dev/null 2>&1 || true
+        ;;
+    esac
+  done <<< "${alias_ids}"
+
+  group_ids="$(openbao_cli list -format=json identity/group/id 2>/dev/null | jq -r '.data.keys[]?' || true)"
+  while IFS= read -r group_id; do
+    [[ -n "${group_id}" ]] || continue
+    group_name="$(remote_group "${group_id}" 2>/dev/null | jq -r '.data.name // empty' || true)"
+    case "${group_name}" in
+      e2e-group|e2e-child-group)
+        openbao_cli delete "identity/group/id/${group_id}" >/dev/null 2>&1 || true
+        ;;
+    esac
+  done <<< "${group_ids}"
+
+  for name in \
+    e2e-created e2e-adopt e2e-group-created-member e2e-unmanaged-member e2e-child-member \
+    e2e-group-child-member e2e-conflict-alias-target e2e-orphan-alias-target e2e-conflict \
+    e2e-orphan e2e-missing-connection e2e-missing-secret; do
+    openbao_cli delete "identity/entity/name/${name}" >/dev/null 2>&1 || true
+  done
 }
 
 remote_entity() {
@@ -199,6 +237,7 @@ kubectl_cmd -n "${OPENBAO_NAMESPACE}" wait --for=condition=available \
   "deployment/${OPENBAO_DEPLOYMENT}" --timeout=5m >/dev/null
 kubectl_cmd -n "${OPERATOR_NAMESPACE}" wait --for=condition=available \
   "deployment/${operator_deployment}" --timeout=5m >/dev/null
+reset_remote_test_objects
 
 kubectl_cmd create namespace "${TEST_NAMESPACE}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
 kubectl_cmd -n "${OPENBAO_NAMESPACE}" get secret "${OPENBAO_TOKEN_SECRET}" -o json \
@@ -538,4 +577,71 @@ assert_remote_absent "${orphan_alias_target_id}"
 
 kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity/e2e-conflict --wait=true >/dev/null
 openbao_cli delete identity/entity/name/e2e-conflict >/dev/null
+
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: e2e-missing-connection
+spec:
+  address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
+  tokenSecretRef:
+    name: ${OPENBAO_TOKEN_SECRET}
+    key: ${OPENBAO_TOKEN_KEY}
+EOF
+wait_ready openbaoconnection/e2e-missing-connection
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntity
+metadata:
+  name: e2e-missing-connection
+spec:
+  connectionRef:
+    name: e2e-missing-connection
+  policies:
+    - default
+  deletionPolicy: Delete
+EOF
+wait_ready openbaoentity/e2e-missing-connection
+missing_connection_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentity/e2e-missing-connection -o jsonpath='{.status.id}')"
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoconnection/e2e-missing-connection --wait=true >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity/e2e-missing-connection --wait=true >/dev/null
+assert_remote_entity "${missing_connection_id}" e2e-missing-connection ""
+openbao_cli delete "identity/entity/id/${missing_connection_id}" >/dev/null
+
+kubectl_cmd -n "${TEST_NAMESPACE}" get secret "${OPENBAO_TOKEN_SECRET}" -o json \
+  | jq 'del(.metadata.namespace, .metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields) | .metadata.name = "e2e-missing-secret-token"' \
+  | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: e2e-missing-secret
+spec:
+  address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
+  tokenSecretRef:
+    name: e2e-missing-secret-token
+    key: ${OPENBAO_TOKEN_KEY}
+EOF
+wait_ready openbaoconnection/e2e-missing-secret
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntity
+metadata:
+  name: e2e-missing-secret
+spec:
+  connectionRef:
+    name: e2e-missing-secret
+  policies:
+    - default
+  deletionPolicy: Delete
+EOF
+wait_ready openbaoentity/e2e-missing-secret
+missing_secret_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentity/e2e-missing-secret -o jsonpath='{.status.id}')"
+kubectl_cmd -n "${TEST_NAMESPACE}" delete secret/e2e-missing-secret-token --wait=true >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity/e2e-missing-secret --wait=true >/dev/null
+assert_remote_entity "${missing_secret_id}" e2e-missing-secret ""
+openbao_cli delete "identity/entity/id/${missing_secret_id}" >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoconnection/e2e-missing-secret --wait=true >/dev/null
+
 echo "Kind/OpenBao integration scenarios passed"

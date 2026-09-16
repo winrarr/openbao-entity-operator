@@ -228,14 +228,20 @@ func (r *OpenBaoGroupReconciler) reconcileDeletion(ctx context.Context, group *o
 	}
 	connection, err := resolveConnection(ctx, r.Client, group.Namespace, group.Spec.ConnectionRef)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: dependencyRetry}, err
+		if isNotFound(err) {
+			return removeFinalizerAfterDependencyLoss(ctx, r.Client, group, "OpenBaoConnection", err)
+		}
+		return ctrl.Result{}, err
 	}
 	apiClient, err := r.clientFor(ctx, connection)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: dependencyRetry}, err
+		if isNotFound(err) {
+			return removeFinalizerAfterDependencyLoss(ctx, r.Client, group, "OpenBaoConnection credentials", err)
+		}
+		return ctrl.Result{}, err
 	}
 	if err := apiClient.DeleteGroup(ctx, group.Status.ID); err != nil && !isNotFound(err) {
-		return ctrl.Result{RequeueAfter: externalRetry}, err
+		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, removeFinalizer(ctx, r.Client, group)
 }
@@ -257,7 +263,7 @@ func (r *OpenBaoGroupReconciler) fail(ctx context.Context, group *openbaov1alpha
 	if statusErr := updateStatusIfChanged(ctx, r.Client, group, before, &group.Status); statusErr != nil {
 		return ctrl.Result{}, statusErr
 	}
-	return ctrl.Result{RequeueAfter: externalRetry}, err
+	return ctrl.Result{}, err
 }
 
 func (r *OpenBaoGroupReconciler) membershipsForGroup(ctx context.Context, group *openbaov1alpha1.OpenBaoGroup) ([]openbaov1alpha1.OpenBaoGroupMembership, error) {

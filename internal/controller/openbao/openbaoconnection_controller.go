@@ -109,7 +109,7 @@ func (r *OpenBaoConnectionReconciler) fail(ctx context.Context, connection *open
 	if statusErr := updateStatusIfChanged(ctx, r.Client, connection, before, &connection.Status); statusErr != nil {
 		return ctrl.Result{}, statusErr
 	}
-	return ctrl.Result{RequeueAfter: externalRetry}, err
+	return ctrl.Result{}, err
 }
 
 func (r *OpenBaoConnectionReconciler) mapSecretToConnections(ctx context.Context, obj client.Object) []reconcile.Request {

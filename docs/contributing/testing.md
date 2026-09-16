@@ -10,6 +10,6 @@ The `Live Kind tests` workflow runs the same `make kind-e2e` target on pushes an
 
 The `Tests` and `Lint` workflows run the non-live checks on pushes and pull requests. The `Docs` workflow generates the CRD reference and performs the strict site build; pushes to `main` publish the resulting site to GitHub Pages. Workflows cancel superseded runs for the same branch or pull request.
 
-The live workflow is intentionally separate from `make check` because it downloads images, starts a cluster, and uses an in-memory OpenBao instance. Run `make kind-down` after local work. A failed run retains its test namespace for inspection; clean it up with `make kind-down` when finished.
+The live workflow is intentionally separate from `make check` because it downloads images, starts a cluster, and uses an in-memory OpenBao instance. A failed run retains its test namespace for inspection; clean it up with `make kind-e2e-clean`, or use `make kind-down` to remove the entire named disposable cluster.
 
 When changing an OpenBao endpoint, update the typed client, add an HTTP contract test, and run the live workflow. When changing API markers or controller permissions, run `make manifests generate` and `make verify-generated`.

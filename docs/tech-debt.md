@@ -25,3 +25,11 @@ Status: open
 The checked-in OpenAPI document is a runtime snapshot from OpenBao v2.6.2. OpenBao may change endpoint behavior or the generated document across releases, and the first slice has no version matrix.
 
 Exit criteria: define the supported OpenBao version policy and run the live contract suite against every supported version before updating the snapshot or client behavior.
+
+## TD-004: Delete-policy cleanup can orphan external objects after dependency loss
+
+Status: accepted limitation
+
+If a Delete-policy entity, alias, or group loses its `OpenBaoConnection` or credential Secret before its Kubernetes deletion is reconciled, the operator logs the loss and releases the finalizer to prevent a stuck Kubernetes object. This preserves cluster recoverability but cannot prove that the external object was deleted.
+
+Exit criteria: introduce a recoverable connection and credential lifecycle that preserves cleanup access during dependent-resource deletion, then add live coverage proving external deletion remains possible after dependency ordering changes.

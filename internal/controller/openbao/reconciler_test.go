@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -158,6 +159,71 @@ func TestEntityReconcilerPersistsReacquiredID(t *testing.T) {
 	}
 	if got.Status.ID != testReacquiredEntityID {
 		t.Fatalf("status ID = %q, want reacquired entity-2", got.Status.ID)
+	}
+}
+
+func TestEntityReconcilerReleasesFinalizerWhenConnectionIsMissing(t *testing.T) {
+	entity := &openbaov1alpha1.OpenBaoEntity{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       testEntityName,
+			Namespace:  testNamespace,
+			Finalizers: []string{finalizerName},
+		},
+		Spec: openbaov1alpha1.OpenBaoEntitySpec{
+			ConnectionRef:  openbaov1alpha1.OpenBaoConnectionReference{Name: testConnectionName},
+			DeletionPolicy: openbaov1alpha1.DeletionPolicyDelete,
+		},
+		Status: openbaov1alpha1.OpenBaoEntityStatus{ID: testEntityID},
+	}
+	kubeClient := newTestClient(entity)
+	reconciler := &OpenBaoEntityReconciler{Client: kubeClient}
+
+	result, err := reconciler.reconcileDeletion(context.Background(), entity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != (ctrl.Result{}) {
+		t.Fatalf("result = %#v, want empty result", result)
+	}
+	var got openbaov1alpha1.OpenBaoEntity
+	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(entity), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Finalizers) != 0 {
+		t.Fatalf("finalizers = %v, want none", got.Finalizers)
+	}
+}
+
+func TestEntityReconcilerReleasesFinalizerWhenTokenSecretIsMissing(t *testing.T) {
+	connection := readyConnection()
+	entity := &openbaov1alpha1.OpenBaoEntity{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       testEntityName,
+			Namespace:  testNamespace,
+			Finalizers: []string{finalizerName},
+		},
+		Spec: openbaov1alpha1.OpenBaoEntitySpec{
+			ConnectionRef:  openbaov1alpha1.OpenBaoConnectionReference{Name: connection.Name},
+			DeletionPolicy: openbaov1alpha1.DeletionPolicyDelete,
+		},
+		Status: openbaov1alpha1.OpenBaoEntityStatus{ID: testEntityID},
+	}
+	kubeClient := newTestClient(connection, entity)
+	reconciler := &OpenBaoEntityReconciler{Client: kubeClient}
+
+	result, err := reconciler.reconcileDeletion(context.Background(), entity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != (ctrl.Result{}) {
+		t.Fatalf("result = %#v, want empty result", result)
+	}
+	var got openbaov1alpha1.OpenBaoEntity
+	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(entity), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Finalizers) != 0 {
+		t.Fatalf("finalizers = %v, want none", got.Finalizers)
 	}
 }
 

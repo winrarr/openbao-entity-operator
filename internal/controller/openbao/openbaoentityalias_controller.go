@@ -231,14 +231,20 @@ func (r *OpenBaoEntityAliasReconciler) reconcileDeletion(ctx context.Context, al
 	}
 	connection, err := resolveConnection(ctx, r.Client, alias.Namespace, alias.Spec.ConnectionRef)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: dependencyRetry}, err
+		if isNotFound(err) {
+			return removeFinalizerAfterDependencyLoss(ctx, r.Client, alias, "OpenBaoConnection", err)
+		}
+		return ctrl.Result{}, err
 	}
 	apiClient, err := r.clientFor(ctx, connection)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: dependencyRetry}, err
+		if isNotFound(err) {
+			return removeFinalizerAfterDependencyLoss(ctx, r.Client, alias, "OpenBaoConnection credentials", err)
+		}
+		return ctrl.Result{}, err
 	}
 	if err := apiClient.DeleteEntityAlias(ctx, alias.Status.ID); err != nil && !isNotFound(err) {
-		return ctrl.Result{RequeueAfter: externalRetry}, err
+		return ctrl.Result{}, err
 	}
 	return ctrl.Result{}, removeFinalizer(ctx, r.Client, alias)
 }
@@ -260,7 +266,7 @@ func (r *OpenBaoEntityAliasReconciler) fail(ctx context.Context, alias *openbaov
 	if statusErr := updateStatusIfChanged(ctx, r.Client, alias, before, &alias.Status); statusErr != nil {
 		return ctrl.Result{}, statusErr
 	}
-	return ctrl.Result{RequeueAfter: externalRetry}, err
+	return ctrl.Result{}, err
 }
 
 func (r *OpenBaoEntityAliasReconciler) mapConnectionToAliases(ctx context.Context, obj client.Object) []reconcile.Request {

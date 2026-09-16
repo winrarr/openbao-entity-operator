@@ -23,6 +23,7 @@ OPENBAO_NAMESPACE ?= openbao
 OPENBAO_TOKEN_SECRET ?= openbao-dev-token
 OPENBAO_TOKEN_KEY ?= token
 OPERATOR_NAMESPACE ?= openbao-entity-operator-system
+E2E_TEST_NAMESPACE ?= openbao-entity-operator-e2e
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
@@ -282,9 +283,13 @@ kind-deploy-e2e: kind-deploy ## Build and deploy the operator for live E2E tests
 .PHONY: kind-e2e
 kind-e2e: ## Run the live OpenBao reconciliation workflow in Kind.
 	$(MAKE) kind-deploy-e2e
-	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
+	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
 		OPENBAO_TOKEN_SECRET="$(OPENBAO_TOKEN_SECRET)" OPENBAO_TOKEN_KEY="$(OPENBAO_TOKEN_KEY)" OPERATOR_NAMESPACE="$(OPERATOR_NAMESPACE)" \
 		./hack/e2e-kind.sh
+
+.PHONY: kind-e2e-clean
+kind-e2e-clean: kind ## Remove only the failed live E2E test resources.
+	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" ./hack/cleanup-kind-e2e.sh
 
 .PHONY: kind-refresh
 kind-refresh: ## Rebuild and redeploy the operator in Kind.

@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -251,6 +252,38 @@ func TestGroupReconcilerDeletesGroup(t *testing.T) {
 	}
 	if baoClient.deleteCalls != 1 {
 		t.Fatalf("delete calls = %d, want 1", baoClient.deleteCalls)
+	}
+	var got openbaov1alpha1.OpenBaoGroup
+	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(group), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Finalizers) != 0 {
+		t.Fatalf("finalizers = %v, want none", got.Finalizers)
+	}
+}
+
+func TestGroupReconcilerReleasesFinalizerWhenConnectionIsMissing(t *testing.T) {
+	group := &openbaov1alpha1.OpenBaoGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       testGroupName,
+			Namespace:  testNamespace,
+			Finalizers: []string{finalizerName},
+		},
+		Spec: openbaov1alpha1.OpenBaoGroupSpec{
+			ConnectionRef:  openbaov1alpha1.OpenBaoConnectionReference{Name: testConnectionName},
+			DeletionPolicy: openbaov1alpha1.DeletionPolicyDelete,
+		},
+		Status: openbaov1alpha1.OpenBaoGroupStatus{ID: testGroupID},
+	}
+	kubeClient := newTestClient(group)
+	reconciler := newGroupReconciler(kubeClient, &fakeGroupClient{})
+
+	result, err := reconciler.reconcileDeletion(context.Background(), group)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result != (ctrl.Result{}) {
+		t.Fatalf("result = %#v, want empty result", result)
 	}
 	var got openbaov1alpha1.OpenBaoGroup
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(group), &got); err != nil {

@@ -20,7 +20,10 @@ The target:
 - verifies entity creation, status ID persistence, metadata/policy/disabled-state updates, external deletion recovery, adoption, conflict protection, orphaning, and opt-in deletion;
 - verifies alias creation, canonical-entity drift correction, adoption, conflict protection, orphaning, and opt-in deletion;
 - verifies group creation, entity and subgroup membership, preservation of an unmanaged remote member, membership-claim removal, and opt-in group deletion;
+- verifies Delete-policy cleanup when the connection or token Secret disappears first;
 - removes the test namespace after a successful run.
+
+Each run first removes only the workflow's fixed `e2e-*` OpenBao fixtures from the disposable OpenBao instance. Do not point this workflow at a shared OpenBao deployment.
 
 The default CNI is the recommended first run because the scenarios test reconciliation and API behavior. It does not prove NetworkPolicy enforcement. To use Cilium, create the cluster with:
 
@@ -41,6 +44,14 @@ kubectl --context kind-openbao-entity-operator describe openbaoentity/e2e-create
 kubectl --context kind-openbao-entity-operator logs deployment/openbao-entity-operator-controller-manager -n openbao-entity-operator-system
 ```
 
+After inspection, remove only the retained E2E resources with the dependency-aware cleanup target:
+
+```sh
+make kind-e2e-clean
+```
+
+The cleanup target deletes membership claims, aliases, groups, entities, and connections in that order, then removes the test namespace. It stops if a resource remains blocked by a non-recoverable finalizer so the failure is visible. It does not delete external OpenBao objects that were left behind after a missing connection or credential.
+
 Set `KEEP_TEST_RESOURCES=true` to retain the namespace after a successful run too. Do not print or copy the `openbao-dev-token` Secret.
 
 ## Cleanup
@@ -55,4 +66,4 @@ This removes the local OpenBao data, token Secret, test resources, and operator 
 
 ## Variables
 
-Useful overrides include `KIND_CLUSTER`, `KIND_NODE_IMAGE`, `OPENBAO_IMAGE`, `OPENBAO_NAMESPACE`, `OPENBAO_TOKEN_SECRET`, and `CILIUM_VERSION`. The Cilium mode requires Helm and uses the pinned Cilium chart version from the root Makefile.
+Useful overrides include `KIND_CLUSTER`, `KIND_NODE_IMAGE`, `E2E_TEST_NAMESPACE`, `OPENBAO_IMAGE`, `OPENBAO_NAMESPACE`, `OPENBAO_TOKEN_SECRET`, and `CILIUM_VERSION`. The Cilium mode requires Helm and uses the pinned Cilium chart version from the root Makefile.

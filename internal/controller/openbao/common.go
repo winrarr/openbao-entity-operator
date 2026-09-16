@@ -29,8 +29,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	openbaov1alpha1 "github.com/rkthtrifork/openbao-entity-operator/api/openbao/v1alpha1"
 	"github.com/rkthtrifork/openbao-entity-operator/internal/openbaoclient"
@@ -39,7 +41,6 @@ import (
 const (
 	finalizerName      = "openbao.openbao-operator.io/finalizer"
 	dependencyRetry    = 15 * time.Second
-	externalRetry      = 30 * time.Second
 	defaultDriftCheck  = 2 * time.Minute
 	conditionReady     = "Ready"
 	conditionStalled   = "Stalled"
@@ -195,6 +196,11 @@ func removeFinalizer(ctx context.Context, kubeClient client.Client, obj client.O
 	}
 	controllerutil.RemoveFinalizer(obj, finalizerName)
 	return kubeClient.Update(ctx, obj)
+}
+
+func removeFinalizerAfterDependencyLoss(ctx context.Context, kubeClient client.Client, obj client.Object, dependency string, err error) (ctrl.Result, error) {
+	log.FromContext(ctx).Error(err, "Releasing deletion finalizer because cleanup dependency is unavailable", "dependency", dependency, "resource", client.ObjectKeyFromObject(obj))
+	return ctrl.Result{}, removeFinalizer(ctx, kubeClient, obj)
 }
 
 func normalizedPolicies(policies []string) []string {

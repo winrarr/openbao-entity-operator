@@ -40,8 +40,9 @@ Acceptance criteria:
 - Given `deletionPolicy=Orphan`, when the Kubernetes resource is deleted, then the operator removes its finalizer without deleting the OpenBao entity.
 - Given `deletionPolicy=Delete`, when the Kubernetes resource is deleted, then the operator deletes the bound OpenBao entity before removing its finalizer.
 - Given OpenBao already reports the entity absent, when deletion is reconciled, then the finalizer is removed successfully.
+- Given the referenced connection or credential Secret is already absent, when a Delete-policy resource is deleted, then the operator logs the dependency loss and removes its finalizer without claiming that the external object was deleted.
 
-Design criteria: finalizer only for external deletion, idempotent not-found handling, and no remote mutation before the delete policy is known.
+Design criteria: finalizer only for external deletion, idempotent not-found handling, dependency-loss escape hatch with an explicit warning, and no remote mutation before the delete policy is known.
 
 ### US-004 — Surface dependencies and failures
 
