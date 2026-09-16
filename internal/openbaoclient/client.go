@@ -42,11 +42,17 @@ const (
 	maxErrorBodySize        = 1 << 20
 	authPathSegment         = "auth"
 	defaultKubernetesMount  = "kubernetes"
+	defaultAppRoleMount     = "approle"
 	serviceAccountTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
 
 // TokenSource returns a short-lived Kubernetes ServiceAccount JWT.
 type TokenSource func(context.Context) (string, error)
+
+// CredentialSource returns a credential when a fresh AppRole login is needed.
+// Sources are deliberately lazy so rotated Kubernetes Secrets are picked up
+// without rebuilding or restarting the operator.
+type CredentialSource func(context.Context) (string, error)
 
 // KubernetesAuthOptions configures the OpenBao Kubernetes auth login.
 type KubernetesAuthOptions struct {
@@ -54,6 +60,14 @@ type KubernetesAuthOptions struct {
 	MountPath string
 	Role      string
 	JWTSource TokenSource
+}
+
+// AppRoleAuthOptions configures OpenBao AppRole login.
+type AppRoleAuthOptions struct {
+	// MountPath is the auth mount path without the leading auth/ prefix.
+	MountPath string
+	RoleID    CredentialSource
+	SecretID  CredentialSource
 }
 
 type tokenLease struct {
@@ -68,6 +82,7 @@ type Client struct {
 	httpClient     *http.Client
 	namespace      string
 	kubernetesAuth *KubernetesAuthOptions
+	appRoleAuth    *AppRoleAuthOptions
 	tokenMu        sync.Mutex
 	token          string
 	tokenLease     tokenLease
@@ -139,7 +154,7 @@ func NewWithKubernetesAuth(baseURL string, options KubernetesAuthOptions, timeou
 	if mountPath == "" {
 		mountPath = defaultKubernetesMount
 	}
-	if err := validateAuthMountPath(mountPath); err != nil {
+	if err := validateAuthMountPath(mountPath, "Kubernetes auth"); err != nil {
 		return nil, err
 	}
 	options.MountPath = mountPath
@@ -148,6 +163,32 @@ func NewWithKubernetesAuth(baseURL string, options KubernetesAuthOptions, timeou
 		return nil, err
 	}
 	client.kubernetesAuth = &options
+	return client, nil
+}
+
+// NewWithAppRole returns a client that obtains and renews an OpenBao token
+// using AppRole. The credential sources are called again when a re-login is
+// needed, allowing Kubernetes Secrets to rotate without an operator restart.
+func NewWithAppRole(baseURL string, options AppRoleAuthOptions, timeout time.Duration, caBundle []byte, namespace string) (*Client, error) {
+	if options.RoleID == nil {
+		return nil, errors.New("OpenBao AppRole role ID source is nil")
+	}
+	if options.SecretID == nil {
+		return nil, errors.New("OpenBao AppRole Secret ID source is nil")
+	}
+	mountPath := options.MountPath
+	if mountPath == "" {
+		mountPath = defaultAppRoleMount
+	}
+	if err := validateAuthMountPath(mountPath, "AppRole auth"); err != nil {
+		return nil, err
+	}
+	options.MountPath = mountPath
+	client, err := newClient(baseURL, timeout, caBundle, namespace)
+	if err != nil {
+		return nil, err
+	}
+	client.appRoleAuth = &options
 	return client, nil
 }
 
@@ -242,16 +283,16 @@ func validateNamespace(namespace string) error {
 	return nil
 }
 
-func validateAuthMountPath(mountPath string) error {
+func validateAuthMountPath(mountPath, authName string) error {
 	if strings.TrimSpace(mountPath) != mountPath || mountPath == "" {
-		return errors.New("OpenBao Kubernetes auth mount path must be non-empty and contain no surrounding whitespace")
+		return fmt.Errorf("OpenBao %s mount path must be non-empty and contain no surrounding whitespace", authName)
 	}
 	if strings.HasPrefix(mountPath, "auth/") {
-		return errors.New("OpenBao Kubernetes auth mount path must omit the auth/ prefix")
+		return fmt.Errorf("OpenBao %s mount path must omit the auth/ prefix", authName)
 	}
 	for segment := range strings.SplitSeq(mountPath, "/") {
 		if segment == "" || segment == "." || segment == ".." || strings.IndexFunc(segment, unicode.IsSpace) >= 0 {
-			return fmt.Errorf("invalid OpenBao Kubernetes auth mount path %q", mountPath)
+			return fmt.Errorf("invalid OpenBao %s mount path %q", authName, mountPath)
 		}
 	}
 	return nil
@@ -270,7 +311,7 @@ func (c *Client) doSegmentsQuery(ctx context.Context, method string, segments []
 		return err
 	}
 	if err := c.doSegmentsQueryWithToken(ctx, method, segments, query, body, target, c.currentToken(), allowedStatuses...); err != nil {
-		if !IsUnauthorized(err) || c.kubernetesAuth == nil {
+		if !IsUnauthorized(err) || !c.usesDynamicAuth() {
 			return err
 		}
 		c.invalidateToken()
@@ -351,7 +392,7 @@ func (c *Client) invalidateToken() {
 }
 
 func (c *Client) ensureToken(ctx context.Context) error {
-	if c.kubernetesAuth == nil {
+	if !c.usesDynamicAuth() {
 		return nil
 	}
 
@@ -368,20 +409,46 @@ func (c *Client) ensureToken(ctx context.Context) error {
 		}
 	}
 
-	jwt, err := c.kubernetesAuth.JWTSource(ctx)
-	if err != nil {
-		return fmt.Errorf("read Kubernetes auth JWT: %w", err)
+	var clientToken string
+	var lease tokenLease
+	var err error
+	switch {
+	case c.kubernetesAuth != nil:
+		jwt, sourceErr := c.kubernetesAuth.JWTSource(ctx)
+		if sourceErr != nil {
+			return fmt.Errorf("read Kubernetes auth JWT: %w", sourceErr)
+		}
+		if strings.TrimSpace(jwt) == "" {
+			return errors.New("kubernetes auth JWT is empty")
+		}
+		clientToken, lease, err = c.loginKubernetes(ctx, jwt)
+	case c.appRoleAuth != nil:
+		roleID, sourceErr := c.appRoleAuth.RoleID(ctx)
+		if sourceErr != nil {
+			return fmt.Errorf("read AppRole role ID: %w", sourceErr)
+		}
+		if strings.TrimSpace(roleID) == "" {
+			return errors.New("AppRole role ID is empty")
+		}
+		secretID, sourceErr := c.appRoleAuth.SecretID(ctx)
+		if sourceErr != nil {
+			return fmt.Errorf("read AppRole Secret ID: %w", sourceErr)
+		}
+		if strings.TrimSpace(secretID) == "" {
+			return errors.New("AppRole Secret ID is empty")
+		}
+		clientToken, lease, err = c.loginAppRole(ctx, roleID, secretID)
 	}
-	if strings.TrimSpace(jwt) == "" {
-		return errors.New("kubernetes auth JWT is empty")
-	}
-	clientToken, lease, err := c.loginKubernetes(ctx, jwt)
 	if err != nil {
 		return err
 	}
 	c.token = clientToken
 	c.tokenLease = lease
 	return nil
+}
+
+func (c *Client) usesDynamicAuth() bool {
+	return c.kubernetesAuth != nil || c.appRoleAuth != nil
 }
 
 func tokenNeedsRefresh(lease tokenLease, now time.Time) bool {

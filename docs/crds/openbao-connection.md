@@ -48,6 +48,27 @@ chart's ServiceAccount token automounting must remain enabled. See the
 [Kubernetes Auth guide](../operations/kubernetes-auth.md) for the OpenBao-side
 setup.
 
+## AppRole
+
+```yaml
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: openbao-approle
+spec:
+  address: https://openbao.example.com:8200
+  appRole:
+    roleIDSecretRef:
+      name: openbao-approle-role
+    secretIDSecretRef:
+      name: openbao-approle-secret
+```
+
+The referenced Secrets must be in the same namespace as the connection. The
+default keys are `role-id` and `secret-id`. OpenBao must already have the
+AppRole auth method and role configured. See the [AppRole guide](../operations/approle.md)
+for credential lifecycle details.
+
 ## Namespace and CA boundaries
 
 Set `spec.namespace` to route requests to an OpenBao namespace. The value is

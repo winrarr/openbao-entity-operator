@@ -20,6 +20,7 @@ nav = [
   ] },
   { "Guides" = [
     { "Connection Patterns" = "reference/connection-patterns.md" },
+    { "Multi-tenancy" = "reference/multi-tenancy.md" },
     { "Deletion and Ownership" = "reference/deletion-and-ownership.md" },
     { "Troubleshooting" = "reference/troubleshooting.md" },
     { "Examples" = [
@@ -51,6 +52,7 @@ nav = [
     { "Operations" = "operations/index.md" },
     { "Local Kind" = "operations/local-kind.md" },
     { "Kubernetes Auth" = "operations/kubernetes-auth.md" },
+    { "AppRole" = "operations/approle.md" },
   ] },
   { "Reference" = [
     { "Reference" = "reference/index.md" },
@@ -60,6 +62,7 @@ nav = [
     { "Operator Configuration" = "reference/operator-configuration.md" },
     { "Generated API Reference" = "reference/api.md" },
     { "OpenBao API Research" = "research/2026-09-16-openbao-api.md" },
+    { "Multi-tenancy Research" = "research/2026-09-16-multi-tenancy.md" },
     { "Verification" = "verification.md" },
   ] },
   { "Contributing" = [

@@ -82,6 +82,8 @@ remote_group() {
 reset_remote_test_objects() {
   local alias_id alias_name group_id group_name name
 
+  openbao_cli delete auth/approle/role/e2e-approle >/dev/null 2>&1 || true
+
   while IFS= read -r alias_id; do
     [[ -n "${alias_id}" ]] || continue
     alias_name="$(remote_alias "${alias_id}" 2>/dev/null | jq -r '.data.name // empty' || true)"
@@ -177,6 +179,25 @@ EOF
     token_period=5m >/dev/null
 }
 
+configure_approle_auth() {
+  if ! openbao_cli auth list -format=json | jq -e 'has("approle/")' >/dev/null 2>&1; then
+    openbao_cli auth enable approle >/dev/null
+  fi
+
+  openbao_cli write auth/approle/role/e2e-approle \
+    token_policies=e2e-operator-policy \
+    token_period=5m >/dev/null
+
+  local role_id secret_id
+  role_id="$(openbao_cli read -field=role_id auth/approle/role/e2e-approle/role-id)"
+  secret_id="$(openbao_cli write -f -field=secret_id auth/approle/role/e2e-approle/secret-id)"
+
+  kubectl_cmd -n "${TEST_NAMESPACE}" create secret generic e2e-approle-role \
+    --from-literal=role-id="${role_id}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
+  kubectl_cmd -n "${TEST_NAMESPACE}" create secret generic e2e-approle-secret \
+    --from-literal=secret-id="${secret_id}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
+}
+
 assert_remote_policy() {
   local name="$1"
   local expected_rules="$2"
@@ -198,6 +219,7 @@ done
 reset_remote_test_objects
 configure_kubernetes_auth
 kubectl_cmd create namespace "${TEST_NAMESPACE}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
+configure_approle_auth
 
 cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1
@@ -211,6 +233,22 @@ spec:
     role: e2e-operator
 EOF
 wait_ready openbaoconnection/openbao
+
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: openbao-approle
+spec:
+  address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
+  appRole:
+    mountPath: approle
+    roleIDSecretRef:
+      name: e2e-approle-role
+    secretIDSecretRef:
+      name: e2e-approle-secret
+EOF
+wait_ready openbaoconnection/openbao-approle
 
 cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1

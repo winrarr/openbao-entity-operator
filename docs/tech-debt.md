@@ -16,7 +16,7 @@ Status: accepted limitation
 
 The manager watches namespaced resources cluster-wide and its generated ClusterRole can read Secrets in every namespace. Same-namespace references constrain the API model, but they do not provide tenant isolation between mutually untrusted users.
 
-Exit criteria: add an independently scoped manager deployment and verify its cache, watch, and Secret permissions, or explicitly retain the trusted-platform deployment boundary as a product decision.
+Exit criteria: add an independently scoped manager deployment and verify its cache, watch, and Secret permissions, or explicitly retain the trusted-platform deployment boundary as a product decision. The product outcome is tracked in [BL-001](backlog.md#bl-001-add-explicit-tenant-boundary-controls); see the [multi-tenancy guide](reference/multi-tenancy.md).
 
 ## TD-003: OpenBao API compatibility is snapshot-based
 

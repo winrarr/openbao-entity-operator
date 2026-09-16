@@ -148,6 +148,108 @@ func TestKubernetesAuthClientLogsInAndRenewsToken(t *testing.T) {
 	}
 }
 
+func TestAppRoleAuthClientLogsInAndRenewsToken(t *testing.T) {
+	var loginCalls, lookupCalls, renewCalls, roleIDCalls, secretIDCalls int
+	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/v1/auth/custom-approle/login":
+			loginCalls++
+			var body map[string]string
+			decodeRequestBody(t, request, &body)
+			if body["role_id"] != "role-id-1" || body["secret_id"] != "secret-id-1" {
+				t.Fatalf("login body = %#v, want role-id-1/secret-id-1", body)
+			}
+			_, _ = fmt.Fprintf(writer, `{"auth":{"client_token":%q,"lease_duration":300,"renewable":true}}`, testClientToken)
+		case testLookupSelfPath:
+			lookupCalls++
+			if got, want := request.Header.Get("X-Vault-Token"), testClientToken; got != want {
+				t.Fatalf("lookup token = %q, want %q", got, want)
+			}
+			_, _ = fmt.Fprint(writer, `{}`)
+		case "/v1/auth/token/renew-self":
+			renewCalls++
+			if got, want := request.Header.Get("X-Vault-Token"), testClientToken; got != want {
+				t.Fatalf("renew token = %q, want %q", got, want)
+			}
+			_, _ = fmt.Fprint(writer, `{"auth":{"lease_duration":300,"renewable":true}}`)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	apiClient, err := NewWithAppRole(server.URL, AppRoleAuthOptions{
+		MountPath: "custom-approle",
+		RoleID: func(context.Context) (string, error) {
+			roleIDCalls++
+			return "role-id-1", nil
+		},
+		SecretID: func(context.Context) (string, error) {
+			secretIDCalls++
+			return "secret-id-1", nil
+		},
+	}, time.Second, nil, "platform/production")
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiClient.now = func() time.Time { return now }
+
+	if err := apiClient.LookupSelf(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(241 * time.Second)
+	if err := apiClient.LookupSelf(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if loginCalls != 1 || lookupCalls != 2 || renewCalls != 1 || roleIDCalls != 1 || secretIDCalls != 1 {
+		t.Fatalf("login/lookup/renew/role ID/Secret ID calls = %d/%d/%d/%d/%d, want 1/2/1/1/1", loginCalls, lookupCalls, renewCalls, roleIDCalls, secretIDCalls)
+	}
+}
+
+func TestAppRoleAuthClientReloginsAfterUnauthorizedResponse(t *testing.T) {
+	var loginCalls, lookupCalls, roleIDCalls, secretIDCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/v1/auth/approle/login":
+			loginCalls++
+			_, _ = fmt.Fprintf(writer, `{"auth":{"client_token":"client-token-%d","renewable":false}}`, loginCalls)
+		case testLookupSelfPath:
+			lookupCalls++
+			if request.Header.Get("X-Vault-Token") == "client-token-1" {
+				http.Error(writer, "token expired", http.StatusForbidden)
+				return
+			}
+			_, _ = fmt.Fprint(writer, `{}`)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	apiClient, err := NewWithAppRole(server.URL, AppRoleAuthOptions{
+		RoleID: func(context.Context) (string, error) {
+			roleIDCalls++
+			return fmt.Sprintf("role-id-%d", roleIDCalls), nil
+		},
+		SecretID: func(context.Context) (string, error) {
+			secretIDCalls++
+			return fmt.Sprintf("secret-id-%d", secretIDCalls), nil
+		},
+	}, time.Second, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := apiClient.LookupSelf(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if loginCalls != 2 || lookupCalls != 2 || roleIDCalls != 2 || secretIDCalls != 2 {
+		t.Fatalf("login/lookup/role ID/Secret ID calls = %d/%d/%d/%d, want 2/2/2/2", loginCalls, lookupCalls, roleIDCalls, secretIDCalls)
+	}
+}
+
 func TestKubernetesAuthClientReloginsAfterUnauthorizedResponse(t *testing.T) {
 	var loginCalls, lookupCalls, jwtCalls int
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -231,6 +333,22 @@ func TestNewWithKubernetesAuthRejectsInvalidOptions(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if _, err := NewWithKubernetesAuth("http://openbao.example.test", options, time.Second, nil, ""); err == nil {
 				t.Fatal("NewWithKubernetesAuth returned nil error")
+			}
+		})
+	}
+}
+
+func TestNewWithAppRoleRejectsInvalidOptions(t *testing.T) {
+	credentialSource := func(context.Context) (string, error) { return "credential", nil }
+	for name, options := range map[string]AppRoleAuthOptions{
+		"nil role ID source":   {SecretID: credentialSource},
+		"nil Secret ID source": {RoleID: credentialSource},
+		"auth prefix":          {MountPath: "auth/approle", RoleID: credentialSource, SecretID: credentialSource},
+		"empty mount path":     {MountPath: "custom//mount", RoleID: credentialSource, SecretID: credentialSource},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := NewWithAppRole("http://openbao.example.test", options, time.Second, nil, ""); err == nil {
+				t.Fatal("NewWithAppRole returned nil error")
 			}
 		})
 	}

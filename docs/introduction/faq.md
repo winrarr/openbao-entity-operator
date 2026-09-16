@@ -13,10 +13,10 @@ target OpenBao endpoints and behavior.
 
 ## Where are OpenBao tokens stored?
 
-Input tokens are read from same-namespace Kubernetes Secrets and retained only
-in memory by the controller client. Kubernetes Auth JWTs are read from the
-projected ServiceAccount token path. Credentials are not written to resource
-status, logs, or generated documentation.
+Input tokens and AppRole credentials are read from same-namespace Kubernetes
+Secrets and retained only in memory by the controller client. Kubernetes Auth
+JWTs are read from the projected ServiceAccount token path. Credentials are not
+written to resource status, logs, or generated documentation.
 
 ## Can I manage an existing policy, entity, or group?
 
@@ -36,6 +36,13 @@ periodic check is needed.
 No. Connections, Secrets, policies, entities, aliases, groups, and membership
 references are namespace-bound. This keeps credential and tenancy boundaries
 explicit.
+
+## Does the operator manage AppRole configuration?
+
+No. OpenBao administrators or another credential process must configure the
+AppRole auth method, role, and Secret ID lifecycle. The operator only consumes
+the role ID and Secret ID from same-namespace Secrets and obtains a short-lived
+token.
 
 ## Does deleting a Kubernetes resource delete OpenBao data?
 

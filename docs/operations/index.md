@@ -2,4 +2,5 @@
 
 - [Local Kind environment](local-kind.md)
 - [Kubernetes Auth](kubernetes-auth.md)
+- [AppRole](approle.md)
 - [Troubleshooting](../reference/troubleshooting.md)

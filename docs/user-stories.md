@@ -2,7 +2,7 @@
 
 ## Context
 
-The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers token- and Kubernetes-authenticated connections, ACL policy lifecycle, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
+The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers token-, Kubernetes-authenticated, and AppRole connections, ACL policy lifecycle, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
 
 ## Current stories
 
@@ -19,7 +19,7 @@ Acceptance criteria:
 - Given a Kubernetes-authenticated token is renewable and approaching expiry, when a dependent request is made, then the token is renewed before the request proceeds.
 - Given a Kubernetes-authenticated token is rejected as expired or revoked, when a request receives an authentication failure, then the operator obtains a fresh token and retries the request once.
 
-Design criteria: exactly one authentication method per connection, same-namespace Secret references for static tokens, projected ServiceAccount JWTs for Kubernetes Auth, bounded HTTP requests, OpenBao health status decoding, token redaction, renewable-token handling, and a watch/retry path for dependency recovery.
+Design criteria: exactly one authentication method per connection, same-namespace Secret references for static tokens and AppRole credentials, projected ServiceAccount JWTs for Kubernetes Auth, bounded HTTP requests, OpenBao health status decoding, credential redaction, renewable-token handling, and a watch/retry path for dependency recovery.
 
 ### US-002 — Manage an OpenBao entity declaratively
 
@@ -130,15 +130,36 @@ Acceptance criteria:
 
 Design criteria: same-namespace immutable connection reference, Kubernetes resource name as the stable OpenBao policy name, exact raw HCL or JSON document comparison, status hash/version instead of duplicating the full policy, explicit create/adopt and deletion policy, typed ACL endpoints only, and live Kubernetes Auth coverage.
 
+### US-010 — Authenticate with AppRole
+
+As a platform operator, I want to authenticate the operator with OpenBao AppRole, so that I can use an existing machine-auth workflow when Kubernetes Auth is unavailable.
+
+Acceptance criteria:
+
+- Given an enabled AppRole mount and configured role, when an `OpenBaoConnection` selects `appRole` with valid role ID and Secret ID references, then the connection logs in through the configured mount and reports `Ready=True`.
+- Given omitted AppRole mount path, when the connection reconciles, then the default `approle` mount is used.
+- Given missing or empty role ID or Secret ID data, when the connection reconciles, then it reports `Ready=False` without exposing credential values in status, logs, or errors.
+- Given a renewable AppRole token, when its lease approaches expiry, then the shared client renews it; if renewal fails or OpenBao rejects it, then both credential Secrets are reread and one fresh login is attempted.
+- Given a token- or Kubernetes-authenticated connection remains configured, when AppRole support is deployed, then its existing behavior remains unchanged.
+
+Design criteria: one typed AppRole configuration, separate same-namespace credential references, explicit mount validation, lazy credential reads, external Secret ID rotation ownership, reusable token lease handling, and no arbitrary authentication request payloads.
+
 ## Future stories
 
-### US-010 — Authenticate with additional OpenBao machine-auth methods
+### US-011 — Operate with explicit Kubernetes tenant boundaries
 
-As a platform operator, I want to use another OpenBao machine-auth method such as AppRole when Kubernetes Auth is not available, so that the operator can integrate with existing deployment boundaries.
+As a platform operator, I want to scope an operator installation to an explicit tenant boundary, so that one tenant cannot use the operator as a confused deputy against another tenant's Kubernetes Secrets or OpenBao identity domain.
 
-Reason to defer: the current implementation only needs token and in-cluster Kubernetes Auth. Additional methods require separate credential lifecycle and rotation semantics, and should not be added until their secret handling and live contract are designed.
+Reason to defer: the current namespaced API and OpenBao namespace routing provide useful locality, but the manager's default cluster-wide watch and Secret permissions are intentionally a trusted-platform deployment. Harbor Operator and Infisical Entity Operator demonstrate stronger deployment-level and domain-level tenancy models that need a deliberate OpenBao-specific design.
 
-Design constraint: future methods should extend the connection authentication model without changing identity controllers or allowing arbitrary request bodies.
+Acceptance criteria:
+
+- Given an installation boundary, when resources are created outside its allowed Kubernetes namespaces, then they are not watched or reconciled.
+- Given tenant-scoped credentials and an OpenBao identity domain, when a tenant resource reconciles, then it cannot select another tenant's Secret, connection, or domain.
+- Given the supported tenant resource kinds and deletion policies, when admission and RBAC are configured, then the allowed operations and external blast radius are explicit and reviewable.
+- Given a separately scoped installation, when it is deployed, then its Kubernetes RBAC and OpenBao permissions are sufficient for its boundary and insufficient for another tenant's boundary.
+
+Design criteria: explicit watch and reference scope, least-privilege RBAC, stable external-domain binding, clear connection ownership, admission-policy integration, and focused boundary verification.
 
 ## Design alternatives and recommendation
 
@@ -153,7 +174,8 @@ Design constraint: future methods should extend the connection authentication mo
 | US-007 | Current | Covered now | Supported later | The typed client applies one validated namespace header to every request |
 | US-008 | Current | Covered now | Supported later | Authentication is selected at connection construction while identity controllers keep a narrow client interface |
 | US-009 | Current | Covered now | Supported later | A typed policy client keeps the raw document and ownership semantics visible without exposing arbitrary system paths |
-| US-010 | Future | Supported later | Supported later | Additional methods can share the connection boundary, but each needs an explicit credential and rotation contract |
+| US-010 | Current | Covered now | Covered now | AppRole extends the connection boundary with lazy credential sources and shared token lease handling |
+| US-011 | Future | Supported later | Supported later | The current same-namespace model is a safe starting point, but deployment/domain enforcement needs a separate design |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.
 

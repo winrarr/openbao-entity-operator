@@ -16,11 +16,11 @@ image. A digest takes precedence over the tag. `replicaCount` may be increased
 for availability; leader election ensures only one replica performs active
 reconciliation at a time.
 
-## ServiceAccount and Kubernetes Auth
+## ServiceAccount and authentication
 
 The chart enables `serviceAccount.automountServiceAccountToken` by default.
-Keep it enabled when any connection uses Kubernetes Auth. Disable it only when
-all connections use static token Secrets.
+Keep it enabled when any connection uses Kubernetes Auth. It may be disabled
+when all connections use static token Secrets or AppRole.
 
 The chart does not configure OpenBao auth methods or roles. Those must be
 prepared by an OpenBao administrator.

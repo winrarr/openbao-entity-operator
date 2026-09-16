@@ -135,7 +135,11 @@ func (r *OpenBaoConnectionReconciler) mapSecretToConnections(ctx context.Context
 	requests := make([]reconcile.Request, 0)
 	for i := range connections.Items {
 		connection := &connections.Items[i]
+		appRoleSecretChanged := connection.Spec.AppRole != nil &&
+			((connection.Spec.AppRole.RoleIDSecretRef.Name == obj.GetName()) ||
+				(connection.Spec.AppRole.SecretIDSecretRef.Name == obj.GetName()))
 		if (connection.Spec.TokenSecretRef != nil && connection.Spec.TokenSecretRef.Name == obj.GetName()) ||
+			appRoleSecretChanged ||
 			(connection.Spec.CABundleSecretRef != nil && connection.Spec.CABundleSecretRef.Name == obj.GetName()) {
 			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(connection)})
 		}

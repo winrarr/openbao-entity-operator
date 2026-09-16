@@ -19,6 +19,7 @@ The target builds the operator image, installs the committed Helm chart, and the
 - installs the generated CRDs and operator manifests;
 - verifies CRD installation and the controller's generated RBAC surface;
 - configures OpenBao Kubernetes Auth and verifies a real projected ServiceAccount login;
+- configures OpenBao AppRole and verifies a real role ID and Secret ID login;
 - verifies one successful ACL policy and entity graph, including policy status version/hash and entity ID persistence;
 - verifies one entity alias binding and one internal group membership against the live OpenBao API;
 - removes the test namespace after a successful run.
@@ -26,10 +27,11 @@ The target builds the operator image, installs the committed Helm chart, and the
 Each run first removes only the workflow's fixed `e2e-*` OpenBao fixtures from the disposable OpenBao instance. Do not point this workflow at a shared OpenBao deployment.
 
 The root token is used only to bootstrap the disposable server and configure the
-test auth method. The main connection and resource graph use Kubernetes Auth
-through the projected operator ServiceAccount JWT. Token-authenticated
-connection behavior is covered by HTTP and reconciliation tests rather than by
-duplicated live fixtures.
+test auth methods. The main connection and resource graph use Kubernetes Auth
+through the projected operator ServiceAccount JWT, while a separate connection
+proves AppRole credential loading. Token-authenticated connection behavior is
+covered by HTTP and reconciliation tests rather than by duplicated live
+fixtures.
 
 The default CNI is the recommended first run because the scenarios test reconciliation and API behavior. It does not prove NetworkPolicy enforcement. To use Cilium, create the cluster with:
 

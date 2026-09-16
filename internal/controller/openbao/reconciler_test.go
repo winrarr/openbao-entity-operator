@@ -335,6 +335,46 @@ func TestConnectionClientCacheReusesKubernetesAuthClient(t *testing.T) {
 	}
 }
 
+func TestConnectionClientCacheReusesAppRoleClient(t *testing.T) {
+	connection := &openbaov1alpha1.OpenBaoConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
+		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
+			Address: testOpenBaoAddress,
+			AppRole: &openbaov1alpha1.AppRoleAuthSpec{
+				RoleIDSecretRef:   openbaov1alpha1.SecretKeyReference{Name: "approle-role"},
+				SecretIDSecretRef: openbaov1alpha1.SecretKeyReference{Name: "approle-secret"},
+			},
+		},
+	}
+	kubeClient := newTestClient(
+		connection,
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "approle-role", Namespace: testNamespace}, Data: map[string][]byte{"role-id": []byte("role-id")}},
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "approle-secret", Namespace: testNamespace}, Data: map[string][]byte{"secret-id": []byte("secret-id")}},
+	)
+	cache := NewConnectionClientCache()
+
+	first, err := cache.ClientFor(context.Background(), kubeClient, connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := cache.ClientFor(context.Background(), kubeClient, connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("AppRole client was not reused across lookups")
+	}
+
+	connection.Spec.AppRole.MountPath = "custom-approle"
+	third, err := cache.ClientFor(context.Background(), kubeClient, connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if third == first {
+		t.Fatal("AppRole client was reused after its mount path changed")
+	}
+}
+
 func readyConnection() *openbaov1alpha1.OpenBaoConnection {
 	return &openbaov1alpha1.OpenBaoConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},

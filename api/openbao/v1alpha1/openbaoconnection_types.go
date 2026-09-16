@@ -22,7 +22,7 @@ import (
 )
 
 // OpenBaoConnectionSpec defines the desired state of OpenBaoConnection.
-// +kubebuilder:validation:XValidation:rule="has(self.tokenSecretRef) != has(self.kubernetesAuth)",message="exactly one of tokenSecretRef or kubernetesAuth must be configured"
+// +kubebuilder:validation:XValidation:rule="(has(self.tokenSecretRef) && !has(self.kubernetesAuth) && !has(self.appRole)) || (!has(self.tokenSecretRef) && has(self.kubernetesAuth) && !has(self.appRole)) || (!has(self.tokenSecretRef) && !has(self.kubernetesAuth) && has(self.appRole))",message="exactly one of tokenSecretRef, kubernetesAuth, or appRole must be configured"
 type OpenBaoConnectionSpec struct {
 	// Address is the OpenBao API address without the /v1 API prefix.
 	// +kubebuilder:validation:Pattern=`^https?://`
@@ -38,16 +38,23 @@ type OpenBaoConnectionSpec struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// TokenSecretRef references a same-namespace Secret containing an OpenBao token.
-	// Exactly one of TokenSecretRef and KubernetesAuth must be configured.
+	// Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured.
 	// +optional
 	TokenSecretRef *SecretKeyReference `json:"tokenSecretRef,omitempty"`
 
 	// KubernetesAuth logs the operator into OpenBao with its projected Kubernetes
 	// ServiceAccount token. The Kubernetes auth method must already be enabled
 	// and configured at the selected mount path.
-	// Exactly one of TokenSecretRef and KubernetesAuth must be configured.
+	// Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured.
 	// +optional
 	KubernetesAuth *KubernetesAuthSpec `json:"kubernetesAuth,omitempty"`
+
+	// AppRole logs the operator into OpenBao with an AppRole role ID and Secret ID
+	// read from same-namespace Secrets. The AppRole auth method and role must
+	// already be configured in OpenBao.
+	// Exactly one of TokenSecretRef, KubernetesAuth, and AppRole must be configured.
+	// +optional
+	AppRole *AppRoleAuthSpec `json:"appRole,omitempty"`
 
 	// CABundleSecretRef optionally references a same-namespace Secret containing a PEM CA bundle.
 	// The key defaults to ca.crt when omitted.
@@ -75,6 +82,24 @@ type KubernetesAuthSpec struct {
 	// +kubebuilder:validation:MaxLength=256
 	// +kubebuilder:validation:Pattern=`^[^[:space:]]+$`
 	Role string `json:"role"`
+}
+
+// AppRoleAuthSpec defines how an OpenBaoConnection uses the AppRole auth
+// method. Both credential references are reread when a new login is needed.
+type AppRoleAuthSpec struct {
+	// MountPath is the auth mount path without the leading auth/ prefix.
+	// +optional
+	// +kubebuilder:default="approle"
+	// +kubebuilder:validation:Pattern=`^[^/[:space:]]+([/][^/[:space:]]+)*$`
+	MountPath string `json:"mountPath,omitempty"`
+
+	// RoleIDSecretRef references a same-namespace Secret containing the AppRole
+	// role ID. The key defaults to role-id.
+	RoleIDSecretRef SecretKeyReference `json:"roleIDSecretRef"`
+
+	// SecretIDSecretRef references a same-namespace Secret containing the AppRole
+	// Secret ID. The key defaults to secret-id.
+	SecretIDSecretRef SecretKeyReference `json:"secretIDSecretRef"`
 }
 
 // OpenBaoConnectionStatus defines the observed state of OpenBaoConnection.

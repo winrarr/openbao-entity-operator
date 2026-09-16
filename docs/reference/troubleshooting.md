@@ -21,6 +21,8 @@ Common causes include:
 - the token lacks the required capability;
 - the Kubernetes Auth mount or role is absent or bound to the wrong
   ServiceAccount;
+- the AppRole mount or role is absent, or the role ID or Secret ID Secret lacks
+  its configured key;
 - a projected ServiceAccount token is disabled; or
 - the OpenBao CA is not trusted by the supplied CA bundle.
 

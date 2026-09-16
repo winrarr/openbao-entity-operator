@@ -1,0 +1,15 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: openbao-approle
+  namespace: openbao
+spec:
+  address: https://openbao.example.com:8200
+  appRole:
+    mountPath: approle
+    roleIDSecretRef:
+      name: openbao-approle-role
+      key: role-id
+    secretIDSecretRef:
+      name: openbao-approle-secret
+      key: secret-id

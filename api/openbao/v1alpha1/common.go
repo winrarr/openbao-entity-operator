@@ -71,7 +71,9 @@ type SecretKeyReference struct {
 	// Name is the Secret resource name.
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name"`
-	// Key is the Secret data key. It defaults to token for token references.
+	// Key is the Secret data key. Defaults depend on the referencing field:
+	// token for token references, role-id for AppRole role IDs, secret-id for
+	// AppRole Secret IDs, and ca.crt for CA bundle references.
 	// +optional
 	Key string `json:"key,omitempty"`
 }

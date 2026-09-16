@@ -6,6 +6,8 @@ Use the reference section for cross-cutting behavior and exact schema details:
   sections.
 - [Connection patterns](connection-patterns.md) explains authentication,
   namespace routing, and CA material.
+- [Multi-tenancy](multi-tenancy.md) describes current namespace boundaries and
+  the trusted-platform deployment model.
 - [Deletion and ownership](deletion-and-ownership.md) explains adoption,
   orphaning, external deletion, and finalizers.
 - [Status and conditions](status-and-conditions.md) explains what controllers
