@@ -10,11 +10,11 @@
 | `make verify-generated` | Tracked generated output has no regeneration diff | Requires a Git checkout and compares only the protected paths |
 | `make test` | Client HTTP behavior and reconciliation transitions pass unit tests | Does not exercise a live Kubernetes API server or OpenBao |
 | `make lint-config lint` | Linter configuration and source checks pass | Linter findings are not a substitute for runtime tests |
-| `make openapi-check` | The checked-in OpenBao reference is valid and contains the entity and alias endpoints used here | The reference is version-specific and dynamic |
+| `make openapi-check` | The checked-in OpenBao reference is valid and contains the entity, alias, and group endpoints used here | The reference is version-specific and dynamic |
 | `make kustomize-build` | The default installation manifests render | Does not apply them to a cluster |
 | `make docs-build` | The generated CRD reference is current and the documentation site passes strict validation | Does not publish the site locally |
 | `make check` | Runs the complete local foundation suite | Does not start external services |
-| `make kind-e2e` | Runs live connection, entity and alias lifecycle, drift, adoption, conflict, orphan, and delete scenarios against OpenBao in Kind | Uses a single in-memory OpenBao dev server |
+| `make kind-e2e` | Runs live connection, entity, alias, group, and membership lifecycle, drift, adoption, conflict, orphan, and delete scenarios against OpenBao in Kind | Uses a single in-memory OpenBao dev server |
 | `make kind-down` | Removes only the named disposable Kind cluster | Deletes local OpenBao data and test resources |
 
 The unit tests use `httptest.Server` for HTTP contracts and controller-runtime's fake Kubernetes client with injected OpenBao clients for reconciliation. The Kind workflow adds live Kubernetes/OpenBao evidence without making the external cluster part of the ordinary check suite.

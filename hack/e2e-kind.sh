@@ -82,6 +82,11 @@ remote_alias() {
   openbao_cli read -format=json "identity/entity-alias/id/${id}"
 }
 
+remote_group() {
+  local id="$1"
+  openbao_cli read -format=json "identity/group/id/${id}"
+}
+
 assert_remote_entity() {
   local id="$1"
   local expected_name="$2"
@@ -117,6 +122,59 @@ assert_remote_alias_absent() {
   local id="$1"
   if remote_alias "${id}" >/dev/null 2>&1; then
     echo "OpenBao entity alias ${id} still exists" >&2
+    return 1
+  fi
+}
+
+assert_remote_group_member() {
+  local id="$1"
+  local member_type="$2"
+  local member_id="$3"
+  local field
+  case "${member_type}" in
+    entity) field=member_entity_ids ;;
+    group) field=member_group_ids ;;
+    *) echo "unsupported group member type ${member_type}" >&2; return 1 ;;
+  esac
+  remote_group "${id}" | jq -e --arg id "${member_id}" --arg field "${field}" '.data[$field] | index($id) != null' >/dev/null
+}
+
+assert_remote_group_member_absent() {
+  local id="$1"
+  local member_type="$2"
+  local member_id="$3"
+  local field
+  case "${member_type}" in
+    entity) field=member_entity_ids ;;
+    group) field=member_group_ids ;;
+    *) echo "unsupported group member type ${member_type}" >&2; return 1 ;;
+  esac
+  remote_group "${id}" | jq -e --arg id "${member_id}" --arg field "${field}" '(.data[$field] // []) | index($id) == null' >/dev/null
+}
+
+wait_for_remote_group_member() {
+  local id="$1"
+  local member_type="$2"
+  local member_id="$3"
+  local expected="$4"
+  for _ in {1..90}; do
+    if [[ "${expected}" == present ]] && assert_remote_group_member "${id}" "${member_type}" "${member_id}"; then
+      return 0
+    fi
+    if [[ "${expected}" == absent ]] && assert_remote_group_member_absent "${id}" "${member_type}" "${member_id}"; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "OpenBao group ${id} member ${member_type}/${member_id} did not become ${expected}" >&2
+  remote_group "${id}" >&2 || true
+  return 1
+}
+
+assert_remote_group_absent() {
+  local id="$1"
+  if remote_group "${id}" >/dev/null 2>&1; then
+    echo "OpenBao group ${id} still exists" >&2
     return 1
   fi
 }
@@ -225,6 +283,93 @@ wait_ready openbaoentity/e2e-adopt
 kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentity/e2e-adopt -o json \
   | jq -e --arg id "${adopt_id}" '.status.id == $id' >/dev/null
 assert_remote_entity "${adopt_id}" e2e-adopt adopted
+
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroup
+metadata:
+  name: e2e-group
+spec:
+  connectionRef:
+    name: openbao
+  metadata:
+    owner: platform
+  policies:
+    - default
+  driftDetectionInterval: 5s
+  deletionPolicy: Delete
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroupMembership
+metadata:
+  name: e2e-group-created-member
+spec:
+  groupRef:
+    name: e2e-group
+  entityRef:
+    name: e2e-created
+EOF
+wait_ready openbaogroup/e2e-group
+wait_ready openbaogroupmembership/e2e-group-created-member
+group_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaogroup/e2e-group -o jsonpath='{.status.id}')"
+[[ -n "${group_id}" ]] || { echo "created group did not publish an ID" >&2; exit 1; }
+assert_remote_group_member "${group_id}" entity "${created_id}"
+
+openbao_cli write identity/entity name=e2e-unmanaged-member policies=default >/dev/null
+unmanaged_member_id="$(openbao_cli read -format=json identity/entity/name/e2e-unmanaged-member | jq -er '.data.id')"
+openbao_cli write "identity/group/id/${group_id}" member_entity_ids="${created_id},${unmanaged_member_id}" member_group_ids= >/dev/null
+wait_for_remote_group_member "${group_id}" entity "${unmanaged_member_id}" present
+wait_for_remote_group_member "${group_id}" entity "${created_id}" present
+
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroup
+metadata:
+  name: e2e-child-group
+spec:
+  connectionRef:
+    name: openbao
+  deletionPolicy: Delete
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroupMembership
+metadata:
+  name: e2e-child-member
+spec:
+  groupRef:
+    name: e2e-child-group
+  entityRef:
+    name: e2e-adopt
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroupMembership
+metadata:
+  name: e2e-group-child-member
+spec:
+  groupRef:
+    name: e2e-group
+  memberGroupRef:
+    name: e2e-child-group
+EOF
+wait_ready openbaogroup/e2e-child-group
+wait_ready openbaogroupmembership/e2e-child-member
+wait_ready openbaogroupmembership/e2e-group-child-member
+child_group_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaogroup/e2e-child-group -o jsonpath='{.status.id}')"
+assert_remote_group_member "${group_id}" group "${child_group_id}"
+assert_remote_group_member "${child_group_id}" entity "${adopt_id}"
+
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaogroupmembership/e2e-group-created-member --wait=true >/dev/null
+wait_for_remote_group_member "${group_id}" entity "${created_id}" absent
+assert_remote_group_member "${group_id}" entity "${unmanaged_member_id}"
+
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaogroupmembership e2e-group-child-member e2e-child-member --wait=false >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" wait --for=delete \
+  openbaogroupmembership/e2e-group-child-member openbaogroupmembership/e2e-child-member --timeout=5m >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaogroup e2e-group e2e-child-group --wait=false >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" wait --for=delete openbaogroup/e2e-group openbaogroup/e2e-child-group --timeout=5m >/dev/null
+assert_remote_group_absent "${group_id}"
+assert_remote_group_absent "${child_group_id}"
+openbao_cli delete "identity/entity/id/${unmanaged_member_id}" >/dev/null
 
 auth_accessor="$(openbao_cli auth list -format=json | jq -er '."token/".accessor')"
 cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null

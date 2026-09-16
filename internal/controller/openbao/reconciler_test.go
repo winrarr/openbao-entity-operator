@@ -73,7 +73,7 @@ func TestEntityReconcilerCreatesAndPersistsIdentity(t *testing.T) {
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(entity), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Status.ID != testEntityID || !conditionTrue(got.Status.Conditions, conditionReady) {
+	if got.Status.ID != testEntityID || !conditionTrue(got.Status.Conditions) {
 		t.Fatalf("status = %#v, want entity-1 and Ready=True", got.Status)
 	}
 	if baoClient.createCalls != 1 {
@@ -113,7 +113,7 @@ func TestEntityReconcilerRefusesUnexpectedAdoption(t *testing.T) {
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(entity), &got); err != nil {
 		t.Fatal(err)
 	}
-	condition := findCondition(got.Status.Conditions, conditionReady)
+	condition := findCondition(got.Status.Conditions)
 	if condition == nil || condition.Reason != "EntityAcquireFailed" || condition.Status != metav1.ConditionFalse {
 		t.Fatalf("Ready condition = %#v, want EntityAcquireFailed/False", condition)
 	}
@@ -184,7 +184,7 @@ func TestConnectionReconcilerRecordsHealthAndAuthentication(t *testing.T) {
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(connection), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Status.Version != "2.6.2" || !got.Status.Authenticated || !conditionTrue(got.Status.Conditions, conditionReady) {
+	if got.Status.Version != "2.6.2" || !got.Status.Authenticated || !conditionTrue(got.Status.Conditions) {
 		t.Fatalf("status = %#v, want authenticated v2.6.2 and Ready=True", got.Status)
 	}
 }
@@ -218,6 +218,10 @@ func newTestClient(objects ...client.Object) client.Client {
 			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoEntity"}
 		case *openbaov1alpha1.OpenBaoEntityAlias:
 			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoEntityAlias"}
+		case *openbaov1alpha1.OpenBaoGroup:
+			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoGroup"}
+		case *openbaov1alpha1.OpenBaoGroupMembership:
+			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoGroupMembership"}
 		}
 	}
 	runtimeObjects := make([]runtime.Object, 0, len(objects))
@@ -225,19 +229,19 @@ func newTestClient(objects ...client.Object) client.Client {
 		runtimeObjects = append(runtimeObjects, object)
 	}
 	result := fake.NewClientBuilder().WithScheme(scheme).
-		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}).
+		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}, &openbaov1alpha1.OpenBaoGroup{}, &openbaov1alpha1.OpenBaoGroupMembership{}).
 		WithRuntimeObjects(runtimeObjects...).Build()
 	return result
 }
 
-func conditionTrue(conditions []metav1.Condition, conditionType string) bool {
-	condition := findCondition(conditions, conditionType)
+func conditionTrue(conditions []metav1.Condition) bool {
+	condition := findCondition(conditions)
 	return condition != nil && condition.Status == metav1.ConditionTrue
 }
 
-func findCondition(conditions []metav1.Condition, conditionType string) *metav1.Condition {
+func findCondition(conditions []metav1.Condition) *metav1.Condition {
 	for i := range conditions {
-		if conditions[i].Type == conditionType {
+		if conditions[i].Type == conditionReady {
 			return &conditions[i]
 		}
 	}

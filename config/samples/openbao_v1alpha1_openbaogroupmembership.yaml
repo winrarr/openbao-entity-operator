@@ -1,0 +1,9 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroupMembership
+metadata:
+  name: platform-payments
+spec:
+  groupRef:
+    name: platform
+  entityRef:
+    name: payments

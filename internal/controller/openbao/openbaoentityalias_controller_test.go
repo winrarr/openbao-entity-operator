@@ -70,7 +70,7 @@ func TestEntityAliasReconcilerCreatesAndPersistsAlias(t *testing.T) {
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(alias), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Status.ID != testAliasID || got.Status.CanonicalID != testEntityID || !conditionTrue(got.Status.Conditions, conditionReady) {
+	if got.Status.ID != testAliasID || got.Status.CanonicalID != testEntityID || !conditionTrue(got.Status.Conditions) {
 		t.Fatalf("status = %#v, want alias-1, entity-1, and Ready=True", got.Status)
 	}
 	if baoClient.createCalls != 1 {
@@ -168,7 +168,7 @@ func TestEntityAliasReconcilerRefusesUnexpectedAdoption(t *testing.T) {
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(alias), &got); err != nil {
 		t.Fatal(err)
 	}
-	condition := findCondition(got.Status.Conditions, conditionReady)
+	condition := findCondition(got.Status.Conditions)
 	if condition == nil || condition.Reason != "AliasAcquireFailed" || condition.Status != metav1.ConditionFalse {
 		t.Fatalf("Ready condition = %#v, want AliasAcquireFailed/False", condition)
 	}

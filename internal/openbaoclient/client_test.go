@@ -33,6 +33,8 @@ const (
 	clientAliasID         = "alias-1"
 	clientAliasName       = "payments-login"
 	clientMountAccessor   = "auth_kubernetes_123"
+	clientGroupID         = "group-1"
+	clientGroupName       = "platform"
 )
 
 func TestEntityClientUsesOpenBaoHeadersAndPaths(t *testing.T) {
@@ -177,7 +179,71 @@ func TestEntityAliasClientUsesOpenBaoAliasEndpoints(t *testing.T) {
 	}
 }
 
+func TestGroupClientUsesOpenBaoGroupEndpoints(t *testing.T) {
+	var requestBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch {
+		case request.Method == http.MethodGet && request.URL.Path == "/v1/identity/group/name/"+clientGroupName:
+			_, _ = fmt.Fprintf(writer, `{"data":{"id":"%s","name":"%s","type":"internal","metadata":{"team":"platform"},"policies":["default"],"member_entity_ids":["entity-1"],"member_group_ids":[]}}`, clientGroupID, clientGroupName)
+		case request.Method == http.MethodPost && request.URL.Path == "/v1/identity/group":
+			decodeAnyRequestBody(t, request, &requestBody)
+			_, _ = fmt.Fprint(writer, `{"data":{"id":"group-1"}}`)
+		case request.Method == http.MethodGet && request.URL.Path == "/v1/identity/group/id/"+clientGroupID:
+			_, _ = fmt.Fprintf(writer, `{"data":{"id":"%s","name":"%s","type":"internal","metadata":{"team":"platform"},"policies":["default"],"member_entity_ids":["entity-1"],"member_group_ids":[]}}`, clientGroupID, clientGroupName)
+		case request.Method == http.MethodPost && request.URL.Path == "/v1/identity/group/id/"+clientGroupID:
+			decodeAnyRequestBody(t, request, &requestBody)
+			_, _ = fmt.Fprintf(writer, `{"data":{"id":"%s"}}`, clientGroupID)
+		case request.Method == http.MethodDelete && request.URL.Path == "/v1/identity/group/id/"+clientGroupID:
+			writer.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	apiClient, err := New(server.URL, "test-token", time.Second, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	group, err := apiClient.GetGroupByName(context.Background(), clientGroupName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if group.ID != clientGroupID || group.MemberEntityIDs[0] != "entity-1" {
+		t.Fatalf("group = %#v, want group-1 with entity-1", group)
+	}
+	if _, err := apiClient.CreateGroup(context.Background(), GroupRequest{
+		Name: clientGroupName, Type: "internal", Policies: []string{"default"}, MemberEntityIDs: []string{"entity-1"}, MemberGroupIDs: []string{},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if requestBody["name"] != clientGroupName || requestBody["type"] != "internal" {
+		t.Fatalf("create body = %#v, want group name/type", requestBody)
+	}
+	updated, err := apiClient.UpdateGroup(context.Background(), clientGroupID, GroupRequest{MemberEntityIDs: []string{"entity-2"}, MemberGroupIDs: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.ID != clientGroupID || requestBody["member_entity_ids"].([]any)[0] != "entity-2" {
+		t.Fatalf("updated group/body = %#v/%#v, want group-1/entity-2", updated, requestBody)
+	}
+	if err := apiClient.DeleteGroup(context.Background(), clientGroupID); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func decodeRequestBody(t *testing.T, request *http.Request, target *map[string]string) {
+	t.Helper()
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(body, target); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func decodeAnyRequestBody(t *testing.T, request *http.Request, target *map[string]any) {
 	t.Helper()
 	body, err := io.ReadAll(request.Body)
 	if err != nil {

@@ -173,6 +173,14 @@ func resolveEntity(ctx context.Context, kubeClient client.Client, namespace stri
 	return &entity, nil
 }
 
+func resolveGroup(ctx context.Context, kubeClient client.Client, namespace string, ref openbaov1alpha1.OpenBaoGroupReference) (*openbaov1alpha1.OpenBaoGroup, error) {
+	var group openbaov1alpha1.OpenBaoGroup
+	if err := kubeClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ref.Name}, &group); err != nil {
+		return nil, err
+	}
+	return &group, nil
+}
+
 func ensureFinalizer(ctx context.Context, kubeClient client.Client, obj client.Object) error {
 	if controllerutil.ContainsFinalizer(obj, finalizerName) {
 		return nil

@@ -5,6 +5,8 @@ resources:
 - bases/openbao.openbao-operator.io_openbaoconnections.yaml
 - bases/openbao.openbao-operator.io_openbaoentities.yaml
 - bases/openbao.openbao-operator.io_openbaoentityaliases.yaml
+- bases/openbao.openbao-operator.io_openbaogroups.yaml
+- bases/openbao.openbao-operator.io_openbaogroupmemberships.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

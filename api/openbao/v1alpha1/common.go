@@ -59,6 +59,13 @@ type OpenBaoEntityReference struct {
 	Name string `json:"name"`
 }
 
+// OpenBaoGroupReference identifies a same-namespace OpenBaoGroup.
+type OpenBaoGroupReference struct {
+	// Name is the OpenBaoGroup resource name.
+	// +kubebuilder:validation:MinLength=1
+	Name string `json:"name"`
+}
+
 // SecretKeyReference identifies a key in a same-namespace Secret.
 type SecretKeyReference struct {
 	// Name is the Secret resource name.

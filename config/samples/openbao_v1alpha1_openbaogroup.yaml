@@ -1,0 +1,10 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroup
+metadata:
+  name: platform
+spec:
+  connectionRef:
+    name: openbao
+  policies:
+    - default
+  deletionPolicy: Orphan

@@ -172,6 +172,13 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoentityalias")
 		os.Exit(1)
 	}
+	if err := (&openbaocontroller.OpenBaoGroupReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaogroup")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

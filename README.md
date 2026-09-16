@@ -1,14 +1,14 @@
 # OpenBao Entity Operator
 
-Kubernetes-native lifecycle management for OpenBao identity entities.
+Kubernetes-native lifecycle management for OpenBao identity entities and groups.
 
-The first vertical slice gives platform teams a declarative boundary around one OpenBao instance and its identity entities:
+The current vertical slice gives platform teams a declarative boundary around one OpenBao instance and its identity resources:
 
 ```text
-Kubernetes Secret → OpenBaoConnection → OpenBaoEntity
+Kubernetes Secret → OpenBaoConnection → OpenBaoEntity / OpenBaoGroup → membership claims
 ```
 
-The operator validates connectivity, reconciles entity metadata, policies, and disabled state, binds auth-method aliases to entities, reports stable external IDs in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
+The operator validates connectivity, reconciles entity metadata, policies, and disabled state, binds auth-method aliases to entities, manages internal groups and explicit membership edges, reports stable external IDs in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
 
 ## Quick start
 
@@ -51,6 +51,32 @@ spec:
 The entity's Kubernetes `metadata.name` is its OpenBao name. Use `creationPolicy: Adopt` or `CreateOrAdopt` when an entity already exists and should be managed instead of treated as a conflict. `deletionPolicy: Delete` is opt-in and permanently removes the recorded OpenBao entity.
 
 An `OpenBaoEntityAlias` references the entity resource, an OpenBao auth-method mount accessor, and the alias name presented by that auth method. Its `status.canonicalID` records the bound entity ID; aliases default to safe orphaning and can opt into external deletion.
+
+An `OpenBaoGroup` uses its Kubernetes name as the OpenBao group name. Create an `OpenBaoGroupMembership` for each entity or subgroup that should be claimed by the group:
+
+```yaml
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroup
+metadata:
+  name: platform
+spec:
+  connectionRef:
+    name: openbao
+  policies:
+    - default
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroupMembership
+metadata:
+  name: platform-payments
+spec:
+  groupRef:
+    name: platform
+  entityRef:
+    name: payments
+```
+
+Membership resources manage only their claimed relationship. Existing remote memberships that are not claimed remain untouched, and deleting a membership claim removes its relationship without deleting the group or entity.
 
 ## Install from a checkout
 

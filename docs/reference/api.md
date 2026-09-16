@@ -12,6 +12,8 @@ Package v1alpha1 contains API Schema definitions for the openbao v1alpha1 API gr
 - [OpenBaoConnection](#openbaoconnection)
 - [OpenBaoEntity](#openbaoentity)
 - [OpenBaoEntityAlias](#openbaoentityalias)
+- [OpenBaoGroup](#openbaogroup)
+- [OpenBaoGroupMembership](#openbaogroupmembership)
 
 
 
@@ -26,6 +28,7 @@ CreationPolicy controls how an external entity is acquired.
 _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
+- [OpenBaoGroupSpec](#openbaogroupspec)
 
 | Field | Description |
 | --- | --- |
@@ -45,6 +48,7 @@ DeletionPolicy controls what happens to an external entity on deletion.
 _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
+- [OpenBaoGroupSpec](#openbaogroupspec)
 
 | Field | Description |
 | --- | --- |
@@ -81,6 +85,7 @@ OpenBaoConnectionReference identifies a same-namespace OpenBaoConnection.
 _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
+- [OpenBaoGroupSpec](#openbaogroupspec)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -174,6 +179,7 @@ OpenBaoEntityReference identifies a same-namespace OpenBaoEntity.
 
 _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
+- [OpenBaoGroupMembershipSpec](#openbaogroupmembershipspec)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -200,6 +206,115 @@ _Appears in:_
 | `metadata` _object (keys:string, values:string)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  | Optional: \{\} <br /> |
 | `policies` _string array_ | Policies is the desired set of OpenBao ACL policy names. |  | Optional: \{\} <br /> |
 | `disabled` _boolean_ | Disabled prevents tokens associated with the entity from being used. |  | Optional: \{\} <br /> |
+
+
+#### OpenBaoGroup
+
+
+
+OpenBaoGroup is the Schema for the openbaogroups API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `openbao.openbao-operator.io/v1alpha1` | | |
+| `kind` _string_ | `OpenBaoGroup` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[OpenBaoGroupSpec](#openbaogroupspec)_ |  |  |  |
+
+
+#### OpenBaoGroupMembership
+
+
+
+OpenBaoGroupMembership is the Schema for the openbaogroupmemberships API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `openbao.openbao-operator.io/v1alpha1` | | |
+| `kind` _string_ | `OpenBaoGroupMembership` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
+| `spec` _[OpenBaoGroupMembershipSpec](#openbaogroupmembershipspec)_ |  |  |  |
+
+
+#### OpenBaoGroupMembershipSpec
+
+
+
+OpenBaoGroupMembershipSpec defines one explicit membership edge.
+
+
+
+_Appears in:_
+- [OpenBaoGroupMembership](#openbaogroupmembership)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `groupRef` _[OpenBaoGroupReference](#openbaogroupreference)_ | GroupRef selects the parent OpenBaoGroup in the same namespace. |  |  |
+| `entityRef` _[OpenBaoEntityReference](#openbaoentityreference)_ | EntityRef selects an OpenBaoEntity to add to the parent group. |  | Optional: \{\} <br /> |
+| `memberGroupRef` _[OpenBaoGroupReference](#openbaogroupreference)_ | MemberGroupRef selects an OpenBaoGroup to add as a subgroup of the parent group. |  | Optional: \{\} <br /> |
+
+
+#### OpenBaoGroupReference
+
+
+
+OpenBaoGroupReference identifies a same-namespace OpenBaoGroup.
+
+
+
+_Appears in:_
+- [OpenBaoGroupMembershipSpec](#openbaogroupmembershipspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the OpenBaoGroup resource name. |  | MinLength: 1 <br /> |
+
+
+#### OpenBaoGroupSpec
+
+
+
+OpenBaoGroupSpec defines the desired state of an OpenBao identity group.
+
+
+
+_Appears in:_
+- [OpenBaoGroup](#openbaogroup)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `connectionRef` _[OpenBaoConnectionReference](#openbaoconnectionreference)_ | ConnectionRef selects the OpenBao API connection in the same namespace. |  |  |
+| `type` _[OpenBaoGroupType](#openbaogrouptype)_ | Type selects an internal or external OpenBao group. Membership resources<br />are supported for internal groups. | Internal | Enum: [Internal External] <br />Optional: \{\} <br /> |
+| `creationPolicy` _[CreationPolicy](#creationpolicy)_ | CreationPolicy controls how an external group is acquired. | Create | Enum: [Create Adopt CreateOrAdopt] <br />Optional: \{\} <br /> |
+| `deletionPolicy` _[DeletionPolicy](#deletionpolicy)_ | DeletionPolicy controls whether the external group is deleted with this resource. | Orphan | Enum: [Delete Orphan] <br />Optional: \{\} <br /> |
+| `driftDetectionInterval` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | DriftDetectionInterval controls periodic checks for changes made outside Kubernetes.<br />A zero duration disables periodic checks. When omitted, the operator default is used. |  | Optional: \{\} <br /> |
+| `metadata` _object (keys:string, values:string)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  | Optional: \{\} <br /> |
+| `policies` _string array_ | Policies is the desired set of OpenBao ACL policy names. |  | Optional: \{\} <br /> |
+
+
+#### OpenBaoGroupType
+
+_Underlying type:_ _string_
+
+OpenBaoGroupType identifies the OpenBao identity group membership model.
+
+
+
+_Appears in:_
+- [OpenBaoGroupSpec](#openbaogroupspec)
+
+| Field | Description |
+| --- | --- |
+| `Internal` |  |
+| `External` |  |
 
 
 #### SecretKeyReference

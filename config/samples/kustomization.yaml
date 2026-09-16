@@ -3,4 +3,6 @@ resources:
 - openbao_v1alpha1_openbaoconnection.yaml
 - openbao_v1alpha1_openbaoentity.yaml
 - openbao_v1alpha1_openbaoentityalias.yaml
+- openbao_v1alpha1_openbaogroup.yaml
+- openbao_v1alpha1_openbaogroupmembership.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

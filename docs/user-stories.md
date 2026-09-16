@@ -2,7 +2,7 @@
 
 ## Context
 
-The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers one connection, entity lifecycle, and entity-alias binding. Future identity capabilities influence the model but are not implemented now.
+The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers one connection, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
 
 ## Current stories
 
@@ -55,8 +55,6 @@ Acceptance criteria:
 
 Design criteria: condition reason stability, retry intervals, dependency watches, and status as the diagnostic contract.
 
-## Future stories
-
 ### US-005 — Manage entity aliases
 
 As a platform operator, I want to bind an OpenBao auth-method alias to an entity, so that authenticated workloads resolve to the declaratively managed identity.
@@ -75,7 +73,19 @@ Design criteria: same-namespace connection and entity references, immutable alia
 
 As a platform operator, I want to manage OpenBao identity groups and their entity membership, so that shared policies can be assigned to teams without duplicating policy configuration on every entity.
 
-Reason to preserve: groups are a core identity relationship and require ownership semantics distinct from entity lifecycle. Current controllers should keep references explicit and avoid treating arbitrary remote objects as Kubernetes-owned by default.
+Acceptance criteria:
+
+- Given a ready connection and an absent internal group, when an `OpenBaoGroup` is reconciled with `creationPolicy=Create`, then OpenBao contains a group named after the Kubernetes resource and the returned ID is stored in status.
+- Given a matching group already exists, when `creationPolicy=Create`, then reconciliation reports a conflict; `Adopt` and `CreateOrAdopt` explicitly allow management of it.
+- Given `deletionPolicy=Orphan`, when an `OpenBaoGroup` is deleted, then only the Kubernetes resource is removed; given `deletionPolicy=Delete`, then the external group is deleted before its finalizer is released.
+- Given an `OpenBaoGroupMembership` references a ready entity or subgroup, when the parent group reconciles, then the corresponding OpenBao membership is present and the membership status records the parent and member IDs.
+- Given a membership claim is deleted, when the parent group reconciles, then only that claimed relationship is removed; other remote memberships and the parent group remain.
+- Given a remote membership not claimed by Kubernetes exists, when a group reconciles, then that membership remains untouched.
+- Given an external group has a membership claim, when it reconciles, then the claim is rejected with a useful status condition because OpenBao manages external-group membership through an external alias.
+
+Design criteria: same-namespace immutable references, stable group IDs, explicit create/adopt and deletion policies, internal-group membership claims, deterministic owned-edge tracking, preservation of unclaimed remote memberships, and watches for all referenced resources.
+
+## Future stories
 
 ### US-007 — Support OpenBao namespaces when needed
 
@@ -92,7 +102,7 @@ Reason to preserve: namespace context changes the effective API target and crede
 | US-003 | Current | Covered now | Supported later | Generic layers tend to obscure deletion safety |
 | US-004 | Current | Covered now | Supported later | Status and dependency behavior belongs in controllers, not SDK calls |
 | US-005 | Current | Covered now | Covered now | Alias client/controller binds to entity status ID without changing entity identity |
-| US-006 | Future | Supported later | Covered now | Explicit group APIs remain possible; generic membership is not required |
+| US-006 | Current | Covered now | Covered now | Group membership is an explicit owned edge while the typed client models OpenBao's group-level update API |
 | US-007 | Future | Supported later | Supported later | Centralized client construction preserves the extension point |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.

@@ -19,6 +19,7 @@ The target:
 - verifies connection health and token authentication;
 - verifies entity creation, status ID persistence, metadata/policy/disabled-state updates, external deletion recovery, adoption, conflict protection, orphaning, and opt-in deletion;
 - verifies alias creation, canonical-entity drift correction, adoption, conflict protection, orphaning, and opt-in deletion;
+- verifies group creation, entity and subgroup membership, preservation of an unmanaged remote member, membership-claim removal, and opt-in group deletion;
 - removes the test namespace after a successful run.
 
 The default CNI is the recommended first run because the scenarios test reconciliation and API behavior. It does not prove NetworkPolicy enforcement. To use Cilium, create the cluster with:
@@ -35,7 +36,7 @@ Failed runs preserve the test namespace so status and logs remain available:
 
 ```sh
 kubectl --context kind-openbao-entity-operator get pods -A
-kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaoentities -n openbao-entity-operator-e2e
+kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaoentities,openbaogroups,openbaogroupmemberships -n openbao-entity-operator-e2e
 kubectl --context kind-openbao-entity-operator describe openbaoentity/e2e-created -n openbao-entity-operator-e2e
 kubectl --context kind-openbao-entity-operator logs deployment/openbao-entity-operator-controller-manager -n openbao-entity-operator-system
 ```
