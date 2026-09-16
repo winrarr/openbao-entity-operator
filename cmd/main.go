@@ -150,31 +150,36 @@ func main() {
 		setupLog.Error(err, "Failed to start manager")
 		os.Exit(1)
 	}
+	connectionClientCache := openbaocontroller.NewConnectionClientCache()
 
 	if err := (&openbaocontroller.OpenBaoConnectionReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoconnection")
 		os.Exit(1)
 	}
 	if err := (&openbaocontroller.OpenBaoEntityReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoentity")
 		os.Exit(1)
 	}
 	if err := (&openbaocontroller.OpenBaoEntityAliasReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoentityalias")
 		os.Exit(1)
 	}
 	if err := (&openbaocontroller.OpenBaoGroupReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaogroup")
 		os.Exit(1)

@@ -2,21 +2,24 @@
 
 ## Context
 
-The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers one connection, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
+The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers token- and Kubernetes-authenticated connections, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
 
 ## Current stories
 
 ### US-001 — Validate an OpenBao connection
 
-As a platform operator, I want to declare an OpenBao address and token Secret, so that dependent resources can know whether OpenBao is reachable and the token is accepted.
+As a platform operator, I want to declare an OpenBao address and supported authentication method, so that dependent resources can know whether OpenBao is reachable and the operator is authorized to manage identities.
 
 Acceptance criteria:
 
 - Given a reachable initialized OpenBao instance and valid token Secret, when the connection reconciles, then `Ready=True`, `Authenticated=True`, and the observed server version is recorded.
 - Given a missing Secret, invalid address, or empty token key, when the connection reconciles, then `Ready=False` with a useful reason and no credential value in status or logs.
 - Given a sealed, standby, or uninitialized instance, when health is checked, then the health state is represented in status and the connection does not claim successful authentication unless token self-lookup succeeds.
+- Given a configured Kubernetes auth mount and role, when the operator's projected ServiceAccount JWT is accepted, then the connection logs in and reports `Ready=True` without requiring a token Secret.
+- Given a Kubernetes-authenticated token is renewable and approaching expiry, when a dependent request is made, then the token is renewed before the request proceeds.
+- Given a Kubernetes-authenticated token is rejected as expired or revoked, when a request receives an authentication failure, then the operator obtains a fresh token and retries the request once.
 
-Design criteria: same-namespace Secret reference, bounded HTTP requests, OpenBao health status decoding, token redaction, and a watch/retry path for dependency recovery.
+Design criteria: exactly one authentication method per connection, same-namespace Secret references for static tokens, projected ServiceAccount JWTs for Kubernetes Auth, bounded HTTP requests, OpenBao health status decoding, token redaction, renewable-token handling, and a watch/retry path for dependency recovery.
 
 ### US-002 — Manage an OpenBao entity declaratively
 
@@ -99,6 +102,30 @@ Acceptance criteria:
 
 Design criteria: namespace context belongs to the connection/client boundary, root compatibility, immutable namespace targeting, OpenBao naming validation, and live isolation coverage.
 
+### US-008 — Use Kubernetes Auth without static operator credentials
+
+As a platform operator, I want the operator to authenticate with OpenBao using its Kubernetes ServiceAccount, so that the deployment does not require a long-lived OpenBao token Secret.
+
+Acceptance criteria:
+
+- Given OpenBao's Kubernetes auth method is configured for the operator ServiceAccount, when an `OpenBaoConnection` selects `kubernetesAuth`, then the operator logs in through the configured auth mount and dependent identity resources reconcile successfully.
+- Given `kubernetesAuth.mountPath` is omitted, when the connection reconciles, then the default `kubernetes` auth mount is used.
+- Given the auth role or projected ServiceAccount token is invalid, when the connection reconciles, then it reports `Ready=False` with a useful reason and does not attempt identity mutations.
+- Given the Kubernetes auth token is renewable, when its lease approaches expiry, then the shared client renews it; if renewal fails or OpenBao rejects the token, then the next request performs one fresh login retry.
+- Given a token-authenticated connection remains configured, when the new API is deployed, then its existing token Secret behavior remains unchanged.
+
+Design criteria: authentication belongs to `OpenBaoConnection`, the client owns login/renew/retry behavior, JWT material is read only from the projected ServiceAccount file, auth mount paths are explicit and validated, and token or JWT values never enter status, errors, logs, or test fixtures.
+
+## Future stories
+
+### US-009 — Authenticate with additional OpenBao machine-auth methods
+
+As a platform operator, I want to use another OpenBao machine-auth method such as AppRole when Kubernetes Auth is not available, so that the operator can integrate with existing deployment boundaries.
+
+Reason to defer: the current implementation only needs token and in-cluster Kubernetes Auth. Additional methods require separate credential lifecycle and rotation semantics, and should not be added until their secret handling and live contract are designed.
+
+Design constraint: future methods should extend the connection authentication model without changing identity controllers or allowing arbitrary request bodies.
+
 ## Design alternatives and recommendation
 
 | Story | Status | Narrow typed HTTP client + explicit CRDs | Full OpenBao SDK + generic resource layer | Notes |
@@ -110,6 +137,8 @@ Design criteria: namespace context belongs to the connection/client boundary, ro
 | US-005 | Current | Covered now | Covered now | Alias client/controller binds to entity status ID without changing entity identity |
 | US-006 | Current | Covered now | Covered now | Group membership is an explicit owned edge while the typed client models OpenBao's group-level update API |
 | US-007 | Current | Covered now | Supported later | The typed client applies one validated namespace header to every request |
+| US-008 | Current | Covered now | Supported later | Authentication is selected at connection construction while identity controllers keep a narrow client interface |
+| US-009 | Future | Supported later | Supported later | Additional methods can share the connection boundary, but each needs an explicit credential and rotation contract |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.
 

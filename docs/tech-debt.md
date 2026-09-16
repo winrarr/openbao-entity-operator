@@ -6,7 +6,7 @@ This register contains material limitations in the current implementation. Plann
 
 Status: accepted limitation
 
-The Kind workflow runs a single OpenBao 2.6.2 dev server with an in-memory data store and a generated local-only root token. It proves API and controller behavior, but not persistence, HA/standby behavior, TLS configuration, or production authentication policy.
+The Kind workflow runs a single OpenBao 2.6.2 dev server with an in-memory data store and a generated local-only root token for bootstrap. It now also configures Kubernetes Auth and runs the operator with a non-root identity policy, but it does not prove persistence, HA/standby behavior, or production TLS configuration.
 
 Exit criteria: add a separately provisioned integration environment that exercises a persistent, non-root authentication setup before making production deployment claims.
 

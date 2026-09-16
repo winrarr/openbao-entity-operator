@@ -59,6 +59,8 @@ serviceAccount:
   create: true
   # If empty and create=true, the release name is used.
   name: ""
+  # Kubernetes Auth uses the ServiceAccount JWT projected into the pod.
+  automountServiceAccountToken: true
 
 podAnnotations: {}
 podLabels: {}

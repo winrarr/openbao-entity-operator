@@ -18,11 +18,13 @@ package openbao
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"maps"
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +39,36 @@ import (
 	openbaov1alpha1 "github.com/rkthtrifork/openbao-entity-operator/api/openbao/v1alpha1"
 	"github.com/rkthtrifork/openbao-entity-operator/internal/openbaoclient"
 )
+
+// ConnectionClientCache keeps Kubernetes Auth clients, and therefore their
+// in-memory OpenBao token leases, alive across reconciliations. Static-token
+// clients are intentionally not cached so a rotated Secret is used immediately.
+type ConnectionClientCache struct {
+	mu      sync.Mutex
+	clients map[types.NamespacedName]cachedConnectionClient
+}
+
+type cachedConnectionClient struct {
+	key    kubernetesClientKey
+	client *openbaoclient.Client
+}
+
+type kubernetesClientKey struct {
+	connection types.NamespacedName
+	address    string
+	namespace  string
+	mountPath  string
+	role       string
+	timeout    time.Duration
+	caDigest   [sha256.Size]byte
+}
+
+// NewConnectionClientCache returns a cache for connection-scoped clients.
+func NewConnectionClientCache() *ConnectionClientCache {
+	return &ConnectionClientCache{
+		clients: make(map[types.NamespacedName]cachedConnectionClient),
+	}
+}
 
 const (
 	finalizerName      = "openbao.openbao-operator.io/finalizer"
@@ -122,11 +154,29 @@ func updateStatusIfChanged(ctx context.Context, kubeClient client.Client, obj cl
 }
 
 func connectionClientFor(ctx context.Context, kubeClient client.Client, connection *openbaov1alpha1.OpenBaoConnection) (*openbaoclient.Client, error) {
-	var secret corev1.Secret
-	if err := kubeClient.Get(ctx, types.NamespacedName{Namespace: connection.Namespace, Name: connection.Spec.TokenSecretRef.Name}, &secret); err != nil {
-		return nil, fmt.Errorf("read token Secret %s/%s: %w", connection.Namespace, connection.Spec.TokenSecretRef.Name, err)
+	timeout := connectionRequestTimeout(connection)
+	caBundle, err := connectionCABundle(ctx, kubeClient, connection)
+	if err != nil {
+		return nil, err
 	}
-	tokenKey := connection.Spec.TokenSecretRef.Key
+
+	if auth := connection.Spec.KubernetesAuth; auth != nil {
+		return openbaoclient.NewWithKubernetesAuth(connection.Spec.Address, openbaoclient.KubernetesAuthOptions{
+			MountPath: auth.MountPath,
+			Role:      auth.Role,
+			JWTSource: openbaoclient.ServiceAccountTokenSource,
+		}, timeout, caBundle, connection.Spec.Namespace)
+	}
+	if connection.Spec.TokenSecretRef == nil {
+		return nil, fmt.Errorf("OpenBaoConnection must configure tokenSecretRef or kubernetesAuth")
+	}
+
+	tokenSecretRef := connection.Spec.TokenSecretRef
+	var secret corev1.Secret
+	if err := kubeClient.Get(ctx, types.NamespacedName{Namespace: connection.Namespace, Name: tokenSecretRef.Name}, &secret); err != nil {
+		return nil, fmt.Errorf("read token Secret %s/%s: %w", connection.Namespace, tokenSecretRef.Name, err)
+	}
+	tokenKey := tokenSecretRef.Key
 	if tokenKey == "" {
 		tokenKey = "token"
 	}
@@ -135,27 +185,79 @@ func connectionClientFor(ctx context.Context, kubeClient client.Client, connecti
 		return nil, fmt.Errorf("token Secret %s/%s has no non-empty %q key", connection.Namespace, connection.Spec.TokenSecretRef.Name, tokenKey)
 	}
 
-	var caBundle []byte
-	if ref := connection.Spec.CABundleSecretRef; ref != nil {
-		var caSecret corev1.Secret
-		if err := kubeClient.Get(ctx, types.NamespacedName{Namespace: connection.Namespace, Name: ref.Name}, &caSecret); err != nil {
-			return nil, fmt.Errorf("read CA bundle Secret %s/%s: %w", connection.Namespace, ref.Name, err)
-		}
-		caKey := ref.Key
-		if caKey == "" {
-			caKey = "ca.crt"
-		}
-		caBundle = caSecret.Data[caKey]
-		if len(caBundle) == 0 {
-			return nil, fmt.Errorf("CA bundle Secret %s/%s has no %q key", connection.Namespace, ref.Name, caKey)
-		}
+	return openbaoclient.NewWithNamespace(connection.Spec.Address, token, timeout, caBundle, connection.Spec.Namespace)
+}
+
+func connectionRequestTimeout(connection *openbaov1alpha1.OpenBaoConnection) time.Duration {
+	if connection.Spec.RequestTimeout != nil && connection.Spec.RequestTimeout.Duration > 0 {
+		return connection.Spec.RequestTimeout.Duration
+	}
+	return 30 * time.Second
+}
+
+func connectionCABundle(ctx context.Context, kubeClient client.Client, connection *openbaov1alpha1.OpenBaoConnection) ([]byte, error) {
+	ref := connection.Spec.CABundleSecretRef
+	if ref == nil {
+		return nil, nil
 	}
 
-	timeout := 30 * time.Second
-	if connection.Spec.RequestTimeout != nil && connection.Spec.RequestTimeout.Duration > 0 {
-		timeout = connection.Spec.RequestTimeout.Duration
+	var caSecret corev1.Secret
+	if err := kubeClient.Get(ctx, types.NamespacedName{Namespace: connection.Namespace, Name: ref.Name}, &caSecret); err != nil {
+		return nil, fmt.Errorf("read CA bundle Secret %s/%s: %w", connection.Namespace, ref.Name, err)
 	}
-	return openbaoclient.NewWithNamespace(connection.Spec.Address, token, timeout, caBundle, connection.Spec.Namespace)
+	caKey := ref.Key
+	if caKey == "" {
+		caKey = "ca.crt"
+	}
+	caBundle := caSecret.Data[caKey]
+	if len(caBundle) == 0 {
+		return nil, fmt.Errorf("CA bundle Secret %s/%s has no %q key", connection.Namespace, ref.Name, caKey)
+	}
+	return caBundle, nil
+}
+
+// ClientFor returns the connection client, retaining Kubernetes Auth token
+// leases across reconciliations while replacing clients when their config or
+// CA bundle changes.
+func (c *ConnectionClientCache) ClientFor(ctx context.Context, kubeClient client.Client, connection *openbaov1alpha1.OpenBaoConnection) (*openbaoclient.Client, error) {
+	if connection.Spec.KubernetesAuth == nil {
+		return connectionClientFor(ctx, kubeClient, connection)
+	}
+
+	caBundle, err := connectionCABundle(ctx, kubeClient, connection)
+	if err != nil {
+		return nil, err
+	}
+	auth := connection.Spec.KubernetesAuth
+	key := kubernetesClientKey{
+		connection: types.NamespacedName{Namespace: connection.Namespace, Name: connection.Name},
+		address:    connection.Spec.Address,
+		namespace:  connection.Spec.Namespace,
+		mountPath:  auth.MountPath,
+		role:       auth.Role,
+		timeout:    connectionRequestTimeout(connection),
+		caDigest:   sha256.Sum256(caBundle),
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.clients == nil {
+		c.clients = make(map[types.NamespacedName]cachedConnectionClient)
+	}
+	if cached, ok := c.clients[key.connection]; ok && cached.key == key {
+		return cached.client, nil
+	}
+
+	apiClient, err := openbaoclient.NewWithKubernetesAuth(connection.Spec.Address, openbaoclient.KubernetesAuthOptions{
+		MountPath: auth.MountPath,
+		Role:      auth.Role,
+		JWTSource: openbaoclient.ServiceAccountTokenSource,
+	}, key.timeout, caBundle, connection.Spec.Namespace)
+	if err != nil {
+		return nil, err
+	}
+	c.clients[key.connection] = cachedConnectionClient{key: key, client: apiClient}
+	return apiClient, nil
 }
 
 func resolveConnection(ctx context.Context, kubeClient client.Client, namespace string, ref openbaov1alpha1.OpenBaoConnectionReference) (*openbaov1alpha1.OpenBaoConnection, error) {

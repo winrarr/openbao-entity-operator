@@ -52,6 +52,27 @@ The entity's Kubernetes `metadata.name` is its OpenBao name. Use `creationPolicy
 
 To target an isolated OpenBao namespace, add `namespace: platform/production` to the connection. The namespace is immutable; create a new connection when moving resources to another OpenBao namespace. Namespace-scoped connections validate the token in that namespace and leave root-only health fields unpopulated.
 
+For an in-cluster deployment, the connection can use OpenBao's Kubernetes Auth
+method instead of a static token Secret. The auth mount and role must already be
+configured in OpenBao, and the chart's ServiceAccount token automount must stay
+enabled:
+
+```yaml
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: openbao-kubernetes-auth
+spec:
+  address: https://openbao.example.com:8200
+  kubernetesAuth:
+    mountPath: kubernetes
+    role: openbao-entity-operator
+```
+
+The client renews renewable auth tokens and performs one fresh login retry after
+OpenBao rejects a token. See the [Kubernetes Auth operations guide](docs/operations/kubernetes-auth.md)
+for the OpenBao-side setup and rotation considerations.
+
 An `OpenBaoEntityAlias` references the entity resource, an OpenBao auth-method mount accessor, and the alias name presented by that auth method. Its `status.canonicalID` records the bound entity ID; aliases default to safe orphaning and can opt into external deletion.
 
 An `OpenBaoGroup` uses its Kubernetes name as the OpenBao group name. Create an `OpenBaoGroupMembership` for each entity or subgroup that should be claimed by the group:

@@ -12,4 +12,4 @@ The `Tests` and `Lint` workflows run the non-live checks on pushes and pull requ
 
 The live workflow is intentionally separate from `make check` because it downloads images, starts a cluster, and uses an in-memory OpenBao instance. A failed run retains its test namespace for inspection; clean it up with `make kind-e2e-clean`, or use `make kind-down` to remove the entire named disposable cluster.
 
-When changing an OpenBao endpoint, update the typed client, add an HTTP contract test, and run the live workflow. When changing API markers or controller permissions, run `make manifests generate` and `make verify-generated`.
+When changing an OpenBao endpoint or authentication flow, update the typed client, add an HTTP contract test, record the external contract in `docs/research/`, and run the live workflow. When changing API markers or controller permissions, run `make manifests generate` and `make verify-generated`.

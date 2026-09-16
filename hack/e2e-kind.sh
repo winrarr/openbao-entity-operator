@@ -76,6 +76,11 @@ openbao_cli() {
     env BAO_ADDR=http://127.0.0.1:8200 bao "$@"
 }
 
+openbao_cli_stdin() {
+  kubectl_cmd -n "${OPENBAO_NAMESPACE}" exec -i "deployment/${OPENBAO_DEPLOYMENT}" -- \
+    env BAO_ADDR=http://127.0.0.1:8200 bao "$@"
+}
+
 openbao_cli_namespace() {
   local namespace="$1"
   shift
@@ -83,11 +88,17 @@ openbao_cli_namespace() {
     env BAO_ADDR=http://127.0.0.1:8200 BAO_NAMESPACE="${namespace}" bao "$@"
 }
 
+openbao_list_ids() {
+  local path="$1"
+  openbao_cli list -format=json "${path}" 2>/dev/null | jq -r \
+    'if type == "object" then .data.keys[]? else .[]? end' || true
+}
+
 reset_remote_test_objects() {
   local alias_id alias_name group_id group_name name
   local alias_ids group_ids
 
-  alias_ids="$(openbao_cli list -format=json identity/entity-alias/id 2>/dev/null | jq -r '.data.keys[]?' || true)"
+  alias_ids="$(openbao_list_ids identity/entity-alias/id)"
   while IFS= read -r alias_id; do
     [[ -n "${alias_id}" ]] || continue
     alias_name="$(remote_alias "${alias_id}" 2>/dev/null | jq -r '.data.name // empty' || true)"
@@ -98,7 +109,7 @@ reset_remote_test_objects() {
     esac
   done <<< "${alias_ids}"
 
-  group_ids="$(openbao_cli list -format=json identity/group/id 2>/dev/null | jq -r '.data.keys[]?' || true)"
+  group_ids="$(openbao_list_ids identity/group/id)"
   while IFS= read -r group_id; do
     [[ -n "${group_id}" ]] || continue
     group_name="$(remote_group "${group_id}" 2>/dev/null | jq -r '.data.name // empty' || true)"
@@ -134,6 +145,61 @@ reset_remote_test_namespaces() {
       return 1
     fi
   done
+}
+
+configure_kubernetes_auth() {
+  if ! openbao_cli auth list -format=json | jq -e 'has("kubernetes/")' >/dev/null 2>&1; then
+    openbao_cli auth enable kubernetes >/dev/null
+  fi
+
+  openbao_cli write auth/kubernetes/config \
+    kubernetes_host=https://kubernetes.default.svc:443 \
+    kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+    token_reviewer_jwt=@/var/run/secrets/kubernetes.io/serviceaccount/token >/dev/null
+
+  openbao_cli_stdin policy write e2e-operator-policy - >/dev/null <<'EOF'
+path "sys/health" {
+  capabilities = ["read"]
+}
+
+path "auth/token/lookup-self" {
+  capabilities = ["read"]
+}
+
+path "auth/token/renew-self" {
+  capabilities = ["update"]
+}
+
+path "identity/entity/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "identity/entity" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "identity/entity-alias/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "identity/entity-alias" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "identity/group/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "identity/group" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+EOF
+
+  openbao_cli write auth/kubernetes/role/e2e-operator \
+    bound_service_account_names=openbao-entity-operator \
+    bound_service_account_namespaces="${OPERATOR_NAMESPACE}" \
+    token_policies=e2e-operator-policy \
+    token_period=5m >/dev/null
 }
 
 remote_entity() {
@@ -289,6 +355,7 @@ kubectl_cmd -n "${OPERATOR_NAMESPACE}" wait --for=condition=available \
   "deployment/${operator_deployment}" --timeout=5m >/dev/null
 reset_remote_test_objects
 reset_remote_test_namespaces
+configure_kubernetes_auth
 
 kubectl_cmd create namespace "${TEST_NAMESPACE}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
 kubectl_cmd -n "${OPENBAO_NAMESPACE}" get secret "${OPENBAO_TOKEN_SECRET}" -o json \
@@ -302,9 +369,9 @@ metadata:
   name: openbao
 spec:
   address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
-  tokenSecretRef:
-    name: ${OPENBAO_TOKEN_SECRET}
-    key: ${OPENBAO_TOKEN_KEY}
+  kubernetesAuth:
+    mountPath: kubernetes
+    role: e2e-operator
 EOF
 wait_ready openbaoconnection/openbao
 

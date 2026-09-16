@@ -13,6 +13,8 @@ Primary sources:
 - [OpenBao namespace API](https://openbao.org/docs/next/api/system/namespaces/)
 - [OpenBao identity entity API](https://openbao.org/docs/2.4.x/api/secret/identity/entity/)
 - [OpenBao identity concepts](https://openbao.org/docs/next/concepts/identity/)
+- [OpenBao Kubernetes Auth](https://openbao.org/docs/next/auth/kubernetes/)
+- [OpenBao token auth API](https://openbao.org/docs/2.4.x/api/auth/token/)
 
 ## Observations
 
@@ -27,6 +29,8 @@ Primary sources:
 - OpenBao namespaces provide isolated identity and policy domains, including entities and groups. Namespace-aware API requests can use the `X-Vault-Namespace` header with an absolute or relative hierarchical namespace path; the root namespace is the default when the header is omitted.
 - Namespace paths cannot end with `/`, contain spaces, or use reserved path segments such as `root`, `sys`, `auth`, `cubbyhole`, or `identity`.
 - In the verified OpenBao v2.6.2 Kind instance, `GET /v1/sys/health` with a namespace header returned HTTP 400 (`operation unavailable in namespaces`), while namespaced token self-lookup remained available. The connection controller therefore uses health checks for root connections and namespaced token self-lookup for namespace-scoped readiness.
+- OpenBao's Kubernetes Auth login endpoint is `POST /v1/auth/<mount>/login` (the default mount is `kubernetes`). It accepts a role and Kubernetes ServiceAccount JWT and returns an `auth.client_token` with lease duration and renewability metadata. The mount must be enabled and configured by the OpenBao administrator before the operator can use it.
+- The token API exposes `POST /v1/auth/token/renew-self` for renewing the current token. The client uses that endpoint before a renewable lease expires and falls back to a fresh Kubernetes Auth login when renewal fails or a request is rejected.
 
 ## Generated reference
 
@@ -48,6 +52,7 @@ The resulting document is OpenAPI 3.0.2, contains 231 paths and includes the ide
 - The operator binds an alias to the ID returned by OpenBao and uses the alias ID list plus candidate reads only for initial adoption. This avoids treating the mutable alias name/mount pair as the long-term identity.
 - The operator binds a group to the ID returned by OpenBao and treats each Kubernetes membership as an explicit owned edge. Because OpenBao updates membership at group scope, the controller tracks previously managed member IDs in group status and preserves unclaimed remote edges.
 - The OpenAPI snapshot is a semantic reference rather than a generator input because OpenBao generates it at runtime and it can vary with version and enabled mounts.
+- The checked-in runtime OpenAPI snapshot does not include the Kubernetes Auth login route because the snapshot was captured before that plugin mount was enabled. The route is therefore tracked against the official auth documentation and covered by focused HTTP contract tests rather than added as an unavailable snapshot path.
 - A small typed client is sufficient for the current entity and connection stories and keeps unrelated secret-engine APIs outside the initial dependency surface.
 - Namespace targeting belongs on `OpenBaoConnection` because it changes the API and credential context for every resource using that connection. The operator therefore validates and applies one header in the shared client rather than duplicating namespace handling across controllers.
 

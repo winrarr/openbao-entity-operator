@@ -235,7 +235,7 @@ func TestConnectionReconcilerRecordsHealthAndAuthentication(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
 		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
 			Address:        testOpenBaoAddress,
-			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
+			TokenSecretRef: &openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
 		},
 	}
 	kubeClient := newTestClient(connection)
@@ -264,7 +264,7 @@ func TestConnectionReconcilerUsesNamespacedAuthenticationWhenHealthIsUnavailable
 		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
 			Address:        testOpenBaoAddress,
 			Namespace:      "platform/production",
-			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
+			TokenSecretRef: &openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
 		},
 	}
 	kubeClient := newTestClient(connection)
@@ -297,12 +297,47 @@ func TestConnectionReconcilerUsesNamespacedAuthenticationWhenHealthIsUnavailable
 	}
 }
 
+func TestConnectionClientCacheReusesKubernetesAuthClient(t *testing.T) {
+	connection := &openbaov1alpha1.OpenBaoConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
+		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
+			Address: testOpenBaoAddress,
+			KubernetesAuth: &openbaov1alpha1.KubernetesAuthSpec{
+				Role: "operator",
+			},
+		},
+	}
+	kubeClient := newTestClient()
+	cache := NewConnectionClientCache()
+
+	first, err := cache.ClientFor(context.Background(), kubeClient, connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := cache.ClientFor(context.Background(), kubeClient, connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("Kubernetes Auth client was not reused across lookups")
+	}
+
+	connection.Spec.KubernetesAuth.Role = "replacement"
+	third, err := cache.ClientFor(context.Background(), kubeClient, connection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if third == first {
+		t.Fatal("Kubernetes Auth client was reused after its role changed")
+	}
+}
+
 func readyConnection() *openbaov1alpha1.OpenBaoConnection {
 	return &openbaov1alpha1.OpenBaoConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
 		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
 			Address:        testOpenBaoAddress,
-			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
+			TokenSecretRef: &openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
 		},
 		Status: openbaov1alpha1.OpenBaoConnectionStatus{Conditions: []metav1.Condition{{
 			Type: conditionReady, Status: metav1.ConditionTrue, Reason: "Reconciled",

@@ -18,7 +18,10 @@ package openbaoclient
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
+	"time"
 )
 
 // Health is the subset of /sys/health needed by the connection status.
@@ -48,4 +51,49 @@ func (c *Client) CheckHealth(ctx context.Context) (*Health, error) {
 // LookupSelf validates the configured token against OpenBao's token auth API.
 func (c *Client) LookupSelf(ctx context.Context) error {
 	return c.do(ctx, http.MethodGet, "auth/token/lookup-self", nil, nil)
+}
+
+type tokenAuth struct {
+	ClientToken   string `json:"client_token"`
+	LeaseDuration int64  `json:"lease_duration"`
+	Renewable     bool   `json:"renewable"`
+}
+
+type tokenAuthResponse struct {
+	Auth tokenAuth `json:"auth"`
+}
+
+func (c *Client) loginKubernetes(ctx context.Context, jwt string) (string, tokenLease, error) {
+	segments := append([]string{authPathSegment}, strings.Split(c.kubernetesAuth.MountPath, "/")...)
+	segments = append(segments, "login")
+	var response tokenAuthResponse
+	if err := c.doSegmentsQueryWithToken(ctx, http.MethodPost, segments, nil, map[string]string{
+		"jwt":  jwt,
+		"role": c.kubernetesAuth.Role,
+	}, &response, ""); err != nil {
+		return "", tokenLease{}, err
+	}
+	if strings.TrimSpace(response.Auth.ClientToken) == "" {
+		return "", tokenLease{}, fmt.Errorf("OpenBao Kubernetes auth response did not include a client token")
+	}
+	return response.Auth.ClientToken, newTokenLease(response.Auth, c.now()), nil
+}
+
+func (c *Client) renewToken(ctx context.Context, token string) (tokenLease, error) {
+	var response tokenAuthResponse
+	if err := c.doSegmentsQueryWithToken(ctx, http.MethodPost, []string{authPathSegment, "token", "renew-self"}, nil, map[string]string{
+		"increment": "",
+	}, &response, token); err != nil {
+		return tokenLease{}, err
+	}
+	return newTokenLease(response.Auth, c.now()), nil
+}
+
+func newTokenLease(auth tokenAuth, now time.Time) tokenLease {
+	lease := tokenLease{renewable: auth.Renewable}
+	if auth.LeaseDuration > 0 {
+		lease.duration = time.Duration(auth.LeaseDuration) * time.Second
+		lease.expiresAt = now.Add(lease.duration)
+	}
+	return lease
 }

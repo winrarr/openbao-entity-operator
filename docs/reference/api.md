@@ -56,6 +56,25 @@ _Appears in:_
 | `Orphan` |  |
 
 
+#### KubernetesAuthSpec
+
+
+
+KubernetesAuthSpec defines how an OpenBaoConnection uses the Kubernetes auth
+method. The operator reads its projected ServiceAccount JWT from the standard
+in-cluster token path and never stores that JWT in Kubernetes status.
+
+
+
+_Appears in:_
+- [OpenBaoConnectionSpec](#openbaoconnectionspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `mountPath` _string_ | MountPath is the OpenBao auth mount path without the leading auth/ prefix. | kubernetes | Pattern: `^[^/[:space:]]+([/][^/[:space:]]+)*$` <br />Optional: \{\} <br /> |
+| `role` _string_ | Role is the role configured in the OpenBao Kubernetes auth method. |  | MaxLength: 256 <br />MinLength: 1 <br />Pattern: `^[^[:space:]]+$` <br /> |
+
+
 #### OpenBaoConnection
 
 
@@ -107,7 +126,8 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `address` _string_ | Address is the OpenBao API address without the /v1 API prefix. |  | MinLength: 1 <br />Pattern: `^https?://` <br /> |
 | `namespace` _string_ | Namespace is an optional absolute or relative OpenBao namespace path.<br />An empty value targets the root namespace. The value is sent as the<br />X-Vault-Namespace request header. |  | Pattern: `^$\|^[^/[:space:]]+([/][^/[:space:]]+)*$` <br />Optional: \{\} <br /> |
-| `tokenSecretRef` _[SecretKeyReference](#secretkeyreference)_ | TokenSecretRef references a same-namespace Secret containing an OpenBao token. |  |  |
+| `tokenSecretRef` _[SecretKeyReference](#secretkeyreference)_ | TokenSecretRef references a same-namespace Secret containing an OpenBao token.<br />Exactly one of TokenSecretRef and KubernetesAuth must be configured. |  | Optional: \{\} <br /> |
+| `kubernetesAuth` _[KubernetesAuthSpec](#kubernetesauthspec)_ | KubernetesAuth logs the operator into OpenBao with its projected Kubernetes<br />ServiceAccount token. The Kubernetes auth method must already be enabled<br />and configured at the selected mount path.<br />Exactly one of TokenSecretRef and KubernetesAuth must be configured. |  | Optional: \{\} <br /> |
 | `caBundleSecretRef` _[SecretKeyReference](#secretkeyreference)_ | CABundleSecretRef optionally references a same-namespace Secret containing a PEM CA bundle.<br />The key defaults to ca.crt when omitted. |  | Optional: \{\} <br /> |
 | `requestTimeout` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | RequestTimeout bounds each request made to OpenBao. | 30s | Optional: \{\} <br /> |
 

@@ -25,6 +25,7 @@ nav = [
   { "Operations" = [
     { "Operations" = "operations/index.md" },
     { "Local Kind" = "operations/local-kind.md" },
+    { "Kubernetes Auth" = "operations/kubernetes-auth.md" },
   ] },
   { "Reference" = [
     { "Generated API Reference" = "reference/api.md" },

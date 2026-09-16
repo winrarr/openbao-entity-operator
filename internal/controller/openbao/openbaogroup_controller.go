@@ -71,8 +71,9 @@ func (e *membershipResolutionError) Unwrap() error { return e.err }
 // OpenBaoGroupMembership claims.
 type OpenBaoGroupReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	NewClient func(context.Context, *openbaov1alpha1.OpenBaoConnection) (GroupClient, error)
+	Scheme      *runtime.Scheme
+	NewClient   func(context.Context, *openbaov1alpha1.OpenBaoConnection) (GroupClient, error)
+	ClientCache *ConnectionClientCache
 }
 
 // +kubebuilder:rbac:groups=openbao.openbao-operator.io,resources=openbaogroups,verbs=get;list;watch;create;update;patch;delete
@@ -173,7 +174,13 @@ func (r *OpenBaoGroupReconciler) clientFor(ctx context.Context, connection *open
 	if r.NewClient != nil {
 		return r.NewClient(ctx, connection)
 	}
-	apiClient, err := connectionClientFor(ctx, r.Client, connection)
+	var apiClient *openbaoclient.Client
+	var err error
+	if r.ClientCache != nil {
+		apiClient, err = r.ClientCache.ClientFor(ctx, r.Client, connection)
+	} else {
+		apiClient, err = connectionClientFor(ctx, r.Client, connection)
+	}
 	if err != nil {
 		return nil, err
 	}

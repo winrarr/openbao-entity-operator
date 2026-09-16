@@ -46,8 +46,9 @@ type AliasClient interface {
 // OpenBaoEntityAliasReconciler reconciles an OpenBaoEntityAlias object.
 type OpenBaoEntityAliasReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	NewClient func(context.Context, *openbaov1alpha1.OpenBaoConnection) (AliasClient, error)
+	Scheme      *runtime.Scheme
+	NewClient   func(context.Context, *openbaov1alpha1.OpenBaoConnection) (AliasClient, error)
+	ClientCache *ConnectionClientCache
 }
 
 // +kubebuilder:rbac:groups=openbao.openbao-operator.io,resources=openbaoentityaliases,verbs=get;list;watch;create;update;patch;delete
@@ -147,6 +148,9 @@ func (r *OpenBaoEntityAliasReconciler) Reconcile(ctx context.Context, req ctrl.R
 func (r *OpenBaoEntityAliasReconciler) clientFor(ctx context.Context, connection *openbaov1alpha1.OpenBaoConnection) (AliasClient, error) {
 	if r.NewClient != nil {
 		return r.NewClient(ctx, connection)
+	}
+	if r.ClientCache != nil {
+		return r.ClientCache.ClientFor(ctx, r.Client, connection)
 	}
 	return connectionClientFor(ctx, r.Client, connection)
 }

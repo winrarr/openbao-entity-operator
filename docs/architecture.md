@@ -11,16 +11,16 @@ Kubernetes API
     ├── OpenBaoEntityAliasReconciler ─┤
     └── OpenBaoGroupReconciler ──────┼── internal/openbaoclient ── OpenBao HTTP API
                                       │
-                              same-namespace Secret
+                  same-namespace Secret or projected ServiceAccount JWT
 ```
 
 The API types and Kubebuilder markers under `api/openbao/v1alpha1` are authoritative. CRDs and deepcopy methods are derived with `make manifests generate`. The OpenAPI file under `hack/` is external reference material only.
 
 ## Connection flow
 
-`OpenBaoConnectionReconciler` reads the referenced Secret, constructs a client with the optional CA bundle and OpenBao namespace, and validates the token with `/v1/auth/token/lookup-self`. Root connections also call `/v1/sys/health`; health statuses such as sealed, standby, and uninitialized are decoded even when OpenBao reports them with non-2xx HTTP codes. OpenBao restricts `/sys/health` in child namespaces, so namespace-scoped connections establish readiness through namespaced token self-lookup. Tokens are never copied into status or log fields.
+`OpenBaoConnectionReconciler` constructs a client with the configured authentication method, optional CA bundle, and OpenBao namespace. Token-authenticated connections read a same-namespace Secret and validate it with `/v1/auth/token/lookup-self`. Kubernetes-authenticated connections read the projected ServiceAccount JWT and log in through `/v1/auth/<mount>/login`; a manager-wide connection cache retains the in-memory client so renewable leases can be renewed across reconciliations, and the client performs one fresh login retry after an authentication failure. Root connections also call `/v1/sys/health`; health statuses such as sealed, standby, and uninitialized are decoded even when OpenBao reports them with non-2xx HTTP codes. OpenBao restricts `/sys/health` in child namespaces, so namespace-scoped connections establish readiness through namespaced token self-lookup. Tokens and JWTs are never copied into status or log fields.
 
-The controller watches referenced Secrets. Changes to a Secret enqueue only connections that reference it. Connections periodically recheck health and authentication so status can recover after OpenBao becomes available again.
+The controller watches referenced Secrets when token authentication or a CA bundle is selected. Kubernetes-authenticated connections periodically re-read the projected JWT and recheck authentication so status can recover after OpenBao becomes available again.
 
 ## Entity flow
 

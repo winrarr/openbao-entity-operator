@@ -19,6 +19,7 @@ package openbaoclient
 import (
 	"context"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -35,6 +36,10 @@ const (
 	clientMountAccessor   = "auth_kubernetes_123"
 	clientGroupID         = "group-1"
 	clientGroupName       = "platform"
+	testAuthRole          = "operator"
+	testJWT               = "jwt-1"
+	testLookupSelfPath    = "/v1/auth/token/lookup-self"
+	testClientToken       = "client-token"
 )
 
 func TestEntityClientUsesOpenBaoHeadersAndPaths(t *testing.T) {
@@ -76,6 +81,156 @@ func TestEntityClientUsesOpenBaoHeadersAndPaths(t *testing.T) {
 	}
 	if got, want := requests, []string{"GET /v1/identity/entity/name/payments"}; fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("requests = %v, want %v", got, want)
+	}
+}
+
+func TestKubernetesAuthClientLogsInAndRenewsToken(t *testing.T) {
+	var loginCalls, lookupCalls, renewCalls, jwtCalls int
+	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/v1/auth/custom-kubernetes/login":
+			loginCalls++
+			var body map[string]string
+			decodeRequestBody(t, request, &body)
+			if body["jwt"] != testJWT || body["role"] != testAuthRole {
+				t.Fatalf("login body = %#v, want jwt-1/operator", body)
+			}
+			_, _ = fmt.Fprintf(writer, `{"auth":{"client_token":%q,"lease_duration":300,"renewable":true}}`, testClientToken)
+		case testLookupSelfPath:
+			lookupCalls++
+			if got, want := request.Header.Get("X-Vault-Token"), testClientToken; got != want {
+				t.Fatalf("lookup token = %q, want %q", got, want)
+			}
+			_, _ = fmt.Fprint(writer, `{}`)
+		case "/v1/auth/token/renew-self":
+			renewCalls++
+			if got, want := request.Header.Get("X-Vault-Token"), testClientToken; got != want {
+				t.Fatalf("renew token = %q, want %q", got, want)
+			}
+			var body map[string]string
+			decodeRequestBody(t, request, &body)
+			if body["increment"] != "" {
+				t.Fatalf("renew body = %#v, want empty increment", body)
+			}
+			_, _ = fmt.Fprint(writer, `{"auth":{"lease_duration":300,"renewable":true}}`)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	apiClient, err := NewWithKubernetesAuth(server.URL, KubernetesAuthOptions{
+		MountPath: "custom-kubernetes",
+		Role:      testAuthRole,
+		JWTSource: func(context.Context) (string, error) {
+			jwtCalls++
+			return testJWT, nil
+		},
+	}, time.Second, nil, "platform/production")
+	if err != nil {
+		t.Fatal(err)
+	}
+	apiClient.now = func() time.Time { return now }
+
+	if err := apiClient.LookupSelf(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	now = now.Add(241 * time.Second)
+	if err := apiClient.LookupSelf(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if loginCalls != 1 || lookupCalls != 2 || renewCalls != 1 || jwtCalls != 1 {
+		t.Fatalf("login/lookup/renew/JWT calls = %d/%d/%d/%d, want 1/2/1/1", loginCalls, lookupCalls, renewCalls, jwtCalls)
+	}
+}
+
+func TestKubernetesAuthClientReloginsAfterUnauthorizedResponse(t *testing.T) {
+	var loginCalls, lookupCalls, jwtCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/v1/auth/kubernetes/login":
+			loginCalls++
+			_, _ = fmt.Fprintf(writer, `{"auth":{"client_token":"client-token-%d","renewable":false}}`, loginCalls)
+		case testLookupSelfPath:
+			lookupCalls++
+			if request.Header.Get("X-Vault-Token") == "client-token-1" {
+				http.Error(writer, "token expired", http.StatusForbidden)
+				return
+			}
+			_, _ = fmt.Fprint(writer, `{}`)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	apiClient, err := NewWithKubernetesAuth(server.URL, KubernetesAuthOptions{
+		Role: testAuthRole,
+		JWTSource: func(context.Context) (string, error) {
+			jwtCalls++
+			return fmt.Sprintf("jwt-%d", jwtCalls), nil
+		},
+	}, time.Second, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := apiClient.LookupSelf(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if loginCalls != 2 || lookupCalls != 2 || jwtCalls != 2 {
+		t.Fatalf("login/lookup/JWT calls = %d/%d/%d, want 2/2/2", loginCalls, lookupCalls, jwtCalls)
+	}
+}
+
+func TestKubernetesAuthClientUsesCABundle(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/v1/auth/kubernetes/login":
+			_, _ = fmt.Fprint(writer, `{"auth":{"client_token":"client-token","renewable":false}}`)
+		case testLookupSelfPath:
+			if got, want := request.Header.Get("X-Vault-Token"), testClientToken; got != want {
+				t.Fatalf("lookup token = %q, want %q", got, want)
+			}
+			_, _ = fmt.Fprint(writer, `{}`)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	caBundle := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	apiClient, err := NewWithKubernetesAuth(server.URL, KubernetesAuthOptions{
+		Role: testAuthRole,
+		JWTSource: func(context.Context) (string, error) {
+			return testJWT, nil
+		},
+	}, time.Second, caBundle, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := apiClient.LookupSelf(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNewWithKubernetesAuthRejectsInvalidOptions(t *testing.T) {
+	jwtSource := func(context.Context) (string, error) { return "jwt", nil }
+	for name, options := range map[string]KubernetesAuthOptions{
+		"empty role":       {JWTSource: jwtSource},
+		"role whitespace":  {Role: "operator role", JWTSource: jwtSource},
+		"nil JWT source":   {Role: testAuthRole},
+		"auth prefix":      {Role: testAuthRole, MountPath: "auth/kubernetes", JWTSource: jwtSource},
+		"empty mount path": {Role: testAuthRole, MountPath: "custom//mount", JWTSource: jwtSource},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := NewWithKubernetesAuth("http://openbao.example.test", options, time.Second, nil, ""); err == nil {
+				t.Fatal("NewWithKubernetesAuth returned nil error")
+			}
+		})
 	}
 }
 

@@ -6,7 +6,7 @@ OpenBao Entity Operator lets a platform team declare OpenBao identity entities a
 
 ## Current scope
 
-- Same-namespace `OpenBaoConnection` resources with an address, optional OpenBao namespace, token Secret, optional CA bundle Secret, and request timeout.
+- Same-namespace `OpenBaoConnection` resources with an address, optional OpenBao namespace, either a token Secret or Kubernetes Auth using the operator ServiceAccount, an optional CA bundle Secret, and request timeout.
 - Same-namespace `OpenBaoEntity` resources whose Kubernetes name is the OpenBao entity name.
 - Same-namespace `OpenBaoEntityAlias` resources that bind an auth-method alias name and mount accessor to an `OpenBaoEntity`.
 - Same-namespace `OpenBaoGroup` resources for internal or external OpenBao identity groups.
@@ -18,7 +18,7 @@ OpenBao Entity Operator lets a platform team declare OpenBao identity entities a
 
 ## Non-goals for the first slice
 
-- Managing OpenBao auth-method mounts or secret engines.
+- Managing or configuring OpenBao auth-method mounts or secret engines; Kubernetes Auth must be configured in advance.
 - Synchronizing secrets or tokens into Kubernetes.
 - Managing entity merges or OIDC configuration.
 - Promising compatibility with Vault distributions or with every OpenBao plugin API.

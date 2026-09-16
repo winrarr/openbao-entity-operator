@@ -45,8 +45,9 @@ type EntityClient interface {
 // OpenBaoEntityReconciler reconciles an OpenBaoEntity object.
 type OpenBaoEntityReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	NewClient func(context.Context, *openbaov1alpha1.OpenBaoConnection) (EntityClient, error)
+	Scheme      *runtime.Scheme
+	NewClient   func(context.Context, *openbaov1alpha1.OpenBaoConnection) (EntityClient, error)
+	ClientCache *ConnectionClientCache
 }
 
 // +kubebuilder:rbac:groups=openbao.openbao-operator.io,resources=openbaoentities,verbs=get;list;watch;create;update;patch;delete
@@ -127,6 +128,9 @@ func (r *OpenBaoEntityReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 func (r *OpenBaoEntityReconciler) clientFor(ctx context.Context, connection *openbaov1alpha1.OpenBaoConnection) (EntityClient, error) {
 	if r.NewClient != nil {
 		return r.NewClient(ctx, connection)
+	}
+	if r.ClientCache != nil {
+		return r.ClientCache.ClientFor(ctx, r.Client, connection)
 	}
 	return connectionClientFor(ctx, r.Client, connection)
 }

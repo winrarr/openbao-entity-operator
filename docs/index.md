@@ -5,6 +5,7 @@
 - [Architecture](architecture.md)
 - [Verification](verification.md)
 - [Operations](operations/index.md)
+- [Kubernetes Auth operations](operations/kubernetes-auth.md)
 - [Contributing](contributing/index.md)
 - [Release process](contributing/releases.md)
 - [OpenBao API research](research/2026-09-16-openbao-api.md)

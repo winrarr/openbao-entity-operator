@@ -79,6 +79,29 @@ spec:
                 required:
                 - name
                 type: object
+              kubernetesAuth:
+                description: |-
+                  KubernetesAuth logs the operator into OpenBao with its projected Kubernetes
+                  ServiceAccount token. The Kubernetes auth method must already be enabled
+                  and configured at the selected mount path.
+                  Exactly one of TokenSecretRef and KubernetesAuth must be configured.
+                properties:
+                  mountPath:
+                    default: kubernetes
+                    description: MountPath is the OpenBao auth mount path without
+                      the leading auth/ prefix.
+                    pattern: ^[^/[:space:]]+([/][^/[:space:]]+)*$
+                    type: string
+                  role:
+                    description: Role is the role configured in the OpenBao Kubernetes
+                      auth method.
+                    maxLength: 256
+                    minLength: 1
+                    pattern: ^[^[:space:]]+$
+                    type: string
+                required:
+                - role
+                type: object
               namespace:
                 description: |-
                   Namespace is an optional absolute or relative OpenBao namespace path.
@@ -94,8 +117,9 @@ spec:
                 description: RequestTimeout bounds each request made to OpenBao.
                 type: string
               tokenSecretRef:
-                description: TokenSecretRef references a same-namespace Secret containing
-                  an OpenBao token.
+                description: |-
+                  TokenSecretRef references a same-namespace Secret containing an OpenBao token.
+                  Exactly one of TokenSecretRef and KubernetesAuth must be configured.
                 properties:
                   key:
                     description: Key is the Secret data key. It defaults to token
@@ -110,14 +134,16 @@ spec:
                 type: object
             required:
             - address
-            - tokenSecretRef
             type: object
+            x-kubernetes-validations:
+            - message: exactly one of tokenSecretRef or kubernetesAuth must be configured
+              rule: has(self.tokenSecretRef) != has(self.kubernetesAuth)
           status:
             description: status defines the observed state of OpenBaoConnection
             properties:
               authenticated:
-                description: Authenticated reports whether the configured token was
-                  accepted.
+                description: Authenticated reports whether the configured authentication
+                  was accepted.
                 type: boolean
               conditions:
                 description: Conditions represent the latest available observations

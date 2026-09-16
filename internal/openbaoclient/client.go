@@ -30,20 +30,48 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 )
 
-const maxErrorBodySize = 1 << 20
+const (
+	maxErrorBodySize        = 1 << 20
+	authPathSegment         = "auth"
+	defaultKubernetesMount  = "kubernetes"
+	serviceAccountTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+)
+
+// TokenSource returns a short-lived Kubernetes ServiceAccount JWT.
+type TokenSource func(context.Context) (string, error)
+
+// KubernetesAuthOptions configures the OpenBao Kubernetes auth login.
+type KubernetesAuthOptions struct {
+	// MountPath is the auth mount path without the leading auth/ prefix.
+	MountPath string
+	Role      string
+	JWTSource TokenSource
+}
+
+type tokenLease struct {
+	expiresAt time.Time
+	duration  time.Duration
+	renewable bool
+}
 
 // Client is a typed client for the OpenBao HTTP API.
 type Client struct {
-	baseURL    *url.URL
-	httpClient *http.Client
-	token      string
-	namespace  string
+	baseURL        *url.URL
+	httpClient     *http.Client
+	namespace      string
+	kubernetesAuth *KubernetesAuthOptions
+	tokenMu        sync.Mutex
+	token          string
+	tokenLease     tokenLease
+	now            func() time.Time
 }
 
 // HTTPError represents a non-successful OpenBao response.
@@ -86,6 +114,44 @@ func NewWithNamespace(baseURL, token string, timeout time.Duration, caBundle []b
 	if strings.TrimSpace(token) == "" {
 		return nil, errors.New("OpenBao token is empty")
 	}
+	client, err := newClient(baseURL, timeout, caBundle, namespace)
+	if err != nil {
+		return nil, err
+	}
+	client.token = token
+	return client, nil
+}
+
+// NewWithKubernetesAuth returns a client that obtains and renews an OpenBao
+// token using the Kubernetes auth method. The JWT source is called again when
+// a re-login is needed, allowing projected ServiceAccount tokens to rotate.
+func NewWithKubernetesAuth(baseURL string, options KubernetesAuthOptions, timeout time.Duration, caBundle []byte, namespace string) (*Client, error) {
+	if strings.TrimSpace(options.Role) == "" {
+		return nil, errors.New("OpenBao Kubernetes auth role is empty")
+	}
+	if strings.IndexFunc(options.Role, unicode.IsSpace) >= 0 {
+		return nil, errors.New("OpenBao Kubernetes auth role must not contain whitespace")
+	}
+	if options.JWTSource == nil {
+		return nil, errors.New("OpenBao Kubernetes auth JWT source is nil")
+	}
+	mountPath := options.MountPath
+	if mountPath == "" {
+		mountPath = defaultKubernetesMount
+	}
+	if err := validateAuthMountPath(mountPath); err != nil {
+		return nil, err
+	}
+	options.MountPath = mountPath
+	client, err := newClient(baseURL, timeout, caBundle, namespace)
+	if err != nil {
+		return nil, err
+	}
+	client.kubernetesAuth = &options
+	return client, nil
+}
+
+func newClient(baseURL string, timeout time.Duration, caBundle []byte, namespace string) (*Client, error) {
 	if err := validateNamespace(namespace); err != nil {
 		return nil, err
 	}
@@ -128,9 +194,27 @@ func NewWithNamespace(baseURL, token string, timeout time.Duration, caBundle []b
 			Timeout:   timeout,
 			Transport: transport,
 		},
-		token:     token,
 		namespace: namespace,
+		now:       time.Now,
 	}, nil
+}
+
+// ServiceAccountTokenSource reads the projected ServiceAccount JWT used by
+// the in-cluster Kubernetes auth flow.
+func ServiceAccountTokenSource(context.Context) (string, error) {
+	return readServiceAccountToken()
+}
+
+func readServiceAccountToken() (string, error) {
+	data, err := os.ReadFile(serviceAccountTokenPath)
+	if err != nil {
+		return "", fmt.Errorf("read projected ServiceAccount token: %w", err)
+	}
+	token := strings.TrimSpace(string(data))
+	if token == "" {
+		return "", errors.New("projected ServiceAccount token is empty")
+	}
+	return token, nil
 }
 
 func validateNamespace(namespace string) error {
@@ -158,6 +242,21 @@ func validateNamespace(namespace string) error {
 	return nil
 }
 
+func validateAuthMountPath(mountPath string) error {
+	if strings.TrimSpace(mountPath) != mountPath || mountPath == "" {
+		return errors.New("OpenBao Kubernetes auth mount path must be non-empty and contain no surrounding whitespace")
+	}
+	if strings.HasPrefix(mountPath, "auth/") {
+		return errors.New("OpenBao Kubernetes auth mount path must omit the auth/ prefix")
+	}
+	for segment := range strings.SplitSeq(mountPath, "/") {
+		if segment == "" || segment == "." || segment == ".." || strings.IndexFunc(segment, unicode.IsSpace) >= 0 {
+			return fmt.Errorf("invalid OpenBao Kubernetes auth mount path %q", mountPath)
+		}
+	}
+	return nil
+}
+
 func (c *Client) do(ctx context.Context, method, path string, body, target any, allowedStatuses ...int) error {
 	return c.doSegments(ctx, method, strings.Split(strings.Trim(path, "/"), "/"), body, target, allowedStatuses...)
 }
@@ -167,6 +266,23 @@ func (c *Client) doSegments(ctx context.Context, method string, segments []strin
 }
 
 func (c *Client) doSegmentsQuery(ctx context.Context, method string, segments []string, query url.Values, body, target any, allowedStatuses ...int) error {
+	if err := c.ensureToken(ctx); err != nil {
+		return err
+	}
+	if err := c.doSegmentsQueryWithToken(ctx, method, segments, query, body, target, c.currentToken(), allowedStatuses...); err != nil {
+		if !IsUnauthorized(err) || c.kubernetesAuth == nil {
+			return err
+		}
+		c.invalidateToken()
+		if err := c.ensureToken(ctx); err != nil {
+			return err
+		}
+		return c.doSegmentsQueryWithToken(ctx, method, segments, query, body, target, c.currentToken(), allowedStatuses...)
+	}
+	return nil
+}
+
+func (c *Client) doSegmentsQueryWithToken(ctx context.Context, method string, segments []string, query url.Values, body, target any, token string, allowedStatuses ...int) error {
 	requestURL := *c.baseURL
 	requestURL.Path = strings.TrimRight(c.baseURL.Path, "/") + "/v1"
 	requestURL.RawPath = strings.TrimRight(c.baseURL.EscapedPath(), "/") + "/v1"
@@ -190,7 +306,7 @@ func (c *Client) doSegmentsQuery(ctx context.Context, method string, segments []
 		return fmt.Errorf("create OpenBao API request: %w", err)
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Vault-Token", c.token)
+	req.Header.Set("X-Vault-Token", token)
 	req.Header.Set("X-Vault-Request", "true")
 	if c.namespace != "" {
 		req.Header.Set("X-Vault-Namespace", c.namespace)
@@ -219,6 +335,65 @@ func (c *Client) doSegmentsQuery(ctx context.Context, method string, segments []
 		return fmt.Errorf("decode OpenBao API response: %w", err)
 	}
 	return nil
+}
+
+func (c *Client) currentToken() string {
+	c.tokenMu.Lock()
+	defer c.tokenMu.Unlock()
+	return c.token
+}
+
+func (c *Client) invalidateToken() {
+	c.tokenMu.Lock()
+	defer c.tokenMu.Unlock()
+	c.token = ""
+	c.tokenLease = tokenLease{}
+}
+
+func (c *Client) ensureToken(ctx context.Context) error {
+	if c.kubernetesAuth == nil {
+		return nil
+	}
+
+	c.tokenMu.Lock()
+	defer c.tokenMu.Unlock()
+	if c.token != "" && !tokenNeedsRefresh(c.tokenLease, c.now()) {
+		return nil
+	}
+
+	if c.token != "" && c.tokenLease.renewable {
+		if lease, err := c.renewToken(ctx, c.token); err == nil {
+			c.tokenLease = lease
+			return nil
+		}
+	}
+
+	jwt, err := c.kubernetesAuth.JWTSource(ctx)
+	if err != nil {
+		return fmt.Errorf("read Kubernetes auth JWT: %w", err)
+	}
+	if strings.TrimSpace(jwt) == "" {
+		return errors.New("kubernetes auth JWT is empty")
+	}
+	clientToken, lease, err := c.loginKubernetes(ctx, jwt)
+	if err != nil {
+		return err
+	}
+	c.token = clientToken
+	c.tokenLease = lease
+	return nil
+}
+
+func tokenNeedsRefresh(lease tokenLease, now time.Time) bool {
+	if lease.expiresAt.IsZero() {
+		return false
+	}
+	if !lease.renewable {
+		return !now.Before(lease.expiresAt)
+	}
+	refreshBefore := min(lease.duration/3, time.Minute)
+	remaining := lease.expiresAt.Sub(now)
+	return remaining <= refreshBefore
 }
 
 func isAllowedStatus(status int, allowed []int) bool {

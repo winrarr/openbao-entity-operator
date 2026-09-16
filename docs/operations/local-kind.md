@@ -14,6 +14,7 @@ The target builds the operator image, installs the committed Helm chart, and the
 - uses Kind's default CNI unless `KIND_CNI=cilium` is supplied;
 - loads `openbao/openbao:2.6.2` and starts a single in-memory dev server;
 - generates a local-only root token into a Kubernetes Secret, without writing it to the checkout or printing it;
+- configures OpenBao Kubernetes Auth for the operator ServiceAccount and gives that role only the identity and token lifecycle permissions needed by the test;
 - builds and loads the operator image;
 - installs the generated CRDs and operator manifests;
 - verifies connection health and token authentication;
@@ -25,6 +26,11 @@ The target builds the operator image, installs the committed Helm chart, and the
 - removes the test namespace after a successful run.
 
 Each run first removes only the workflow's fixed `e2e-*` OpenBao fixtures from the disposable OpenBao instance. Do not point this workflow at a shared OpenBao deployment.
+
+The root token is used only to bootstrap the disposable server and configure the
+test auth method. The main connection and identity lifecycle use Kubernetes Auth
+through the projected operator ServiceAccount JWT. Token-authenticated resources
+remain in the workflow for dependency-loss and cleanup scenarios.
 
 The default CNI is the recommended first run because the scenarios test reconciliation and API behavior. It does not prove NetworkPolicy enforcement. To use Cilium, create the cluster with:
 

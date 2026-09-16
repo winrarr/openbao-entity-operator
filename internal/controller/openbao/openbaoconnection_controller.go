@@ -41,8 +41,9 @@ type ConnectionClient interface {
 // OpenBaoConnectionReconciler reconciles an OpenBaoConnection object.
 type OpenBaoConnectionReconciler struct {
 	client.Client
-	Scheme    *runtime.Scheme
-	NewClient func(context.Context, *openbaov1alpha1.OpenBaoConnection) (ConnectionClient, error)
+	Scheme      *runtime.Scheme
+	NewClient   func(context.Context, *openbaov1alpha1.OpenBaoConnection) (ConnectionClient, error)
+	ClientCache *ConnectionClientCache
 }
 
 // +kubebuilder:rbac:groups=openbao.openbao-operator.io,resources=openbaoconnections,verbs=get;list;watch;create;update;patch;delete
@@ -93,9 +94,9 @@ func (r *OpenBaoConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	connection.Status.Authenticated = true
-	readyMessage := "OpenBao is reachable and the configured token is valid"
+	readyMessage := "OpenBao is reachable and configured authentication succeeded"
 	if connection.Spec.Namespace != "" {
-		readyMessage = "The configured token is valid in the OpenBao namespace"
+		readyMessage = "Configured authentication succeeded in the OpenBao namespace"
 	}
 	markReady(&connection.Status.Conditions, connection.Generation, readyMessage)
 	if err := updateStatusIfChanged(ctx, r.Client, &connection, before, &connection.Status); err != nil {
@@ -109,6 +110,9 @@ func (r *OpenBaoConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *OpenBaoConnectionReconciler) clientFor(ctx context.Context, connection *openbaov1alpha1.OpenBaoConnection) (ConnectionClient, error) {
 	if r.NewClient != nil {
 		return r.NewClient(ctx, connection)
+	}
+	if r.ClientCache != nil {
+		return r.ClientCache.ClientFor(ctx, r.Client, connection)
 	}
 	return connectionClientFor(ctx, r.Client, connection)
 }
@@ -131,7 +135,7 @@ func (r *OpenBaoConnectionReconciler) mapSecretToConnections(ctx context.Context
 	requests := make([]reconcile.Request, 0)
 	for i := range connections.Items {
 		connection := &connections.Items[i]
-		if connection.Spec.TokenSecretRef.Name == obj.GetName() ||
+		if (connection.Spec.TokenSecretRef != nil && connection.Spec.TokenSecretRef.Name == obj.GetName()) ||
 			(connection.Spec.CABundleSecretRef != nil && connection.Spec.CABundleSecretRef.Name == obj.GetName()) {
 			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(connection)})
 		}

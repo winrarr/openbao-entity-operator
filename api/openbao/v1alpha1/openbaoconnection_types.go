@@ -22,6 +22,7 @@ import (
 )
 
 // OpenBaoConnectionSpec defines the desired state of OpenBaoConnection.
+// +kubebuilder:validation:XValidation:rule="has(self.tokenSecretRef) != has(self.kubernetesAuth)",message="exactly one of tokenSecretRef or kubernetesAuth must be configured"
 type OpenBaoConnectionSpec struct {
 	// Address is the OpenBao API address without the /v1 API prefix.
 	// +kubebuilder:validation:Pattern=`^https?://`
@@ -37,7 +38,16 @@ type OpenBaoConnectionSpec struct {
 	Namespace string `json:"namespace,omitempty"`
 
 	// TokenSecretRef references a same-namespace Secret containing an OpenBao token.
-	TokenSecretRef SecretKeyReference `json:"tokenSecretRef"`
+	// Exactly one of TokenSecretRef and KubernetesAuth must be configured.
+	// +optional
+	TokenSecretRef *SecretKeyReference `json:"tokenSecretRef,omitempty"`
+
+	// KubernetesAuth logs the operator into OpenBao with its projected Kubernetes
+	// ServiceAccount token. The Kubernetes auth method must already be enabled
+	// and configured at the selected mount path.
+	// Exactly one of TokenSecretRef and KubernetesAuth must be configured.
+	// +optional
+	KubernetesAuth *KubernetesAuthSpec `json:"kubernetesAuth,omitempty"`
 
 	// CABundleSecretRef optionally references a same-namespace Secret containing a PEM CA bundle.
 	// The key defaults to ca.crt when omitted.
@@ -48,6 +58,23 @@ type OpenBaoConnectionSpec struct {
 	// +optional
 	// +kubebuilder:default="30s"
 	RequestTimeout *metav1.Duration `json:"requestTimeout,omitempty"`
+}
+
+// KubernetesAuthSpec defines how an OpenBaoConnection uses the Kubernetes auth
+// method. The operator reads its projected ServiceAccount JWT from the standard
+// in-cluster token path and never stores that JWT in Kubernetes status.
+type KubernetesAuthSpec struct {
+	// MountPath is the OpenBao auth mount path without the leading auth/ prefix.
+	// +optional
+	// +kubebuilder:default="kubernetes"
+	// +kubebuilder:validation:Pattern=`^[^/[:space:]]+([/][^/[:space:]]+)*$`
+	MountPath string `json:"mountPath,omitempty"`
+
+	// Role is the role configured in the OpenBao Kubernetes auth method.
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:Pattern=`^[^[:space:]]+$`
+	Role string `json:"role"`
 }
 
 // OpenBaoConnectionStatus defines the observed state of OpenBaoConnection.
@@ -76,7 +103,7 @@ type OpenBaoConnectionStatus struct {
 	// +optional
 	Standby bool `json:"standby,omitempty"`
 
-	// Authenticated reports whether the configured token was accepted.
+	// Authenticated reports whether the configured authentication was accepted.
 	// +optional
 	Authenticated bool `json:"authenticated,omitempty"`
 
