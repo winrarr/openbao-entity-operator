@@ -1,0 +1,22 @@
+# Prometheus Monitor Service (Metrics)
+# Enable this optional monitor only with a trusted metrics certificate; apply
+# monitor_tls_patch.yaml when certificates are provisioned by cert-manager.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    control-plane: controller-manager
+    app.kubernetes.io/name: openbao-entity-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: controller-manager-metrics-monitor
+  namespace: system
+spec:
+  endpoints:
+    - path: /metrics
+      port: https # Ensure this is the name of the port that exposes HTTPS metrics
+      scheme: https
+      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      app.kubernetes.io/name: openbao-entity-operator

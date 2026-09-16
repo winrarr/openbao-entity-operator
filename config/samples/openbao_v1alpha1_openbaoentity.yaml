@@ -1,0 +1,15 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntity
+metadata:
+  labels:
+    app.kubernetes.io/name: openbao-entity-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: openbaoentity-sample
+spec:
+  connectionRef:
+    name: openbaoconnection-sample
+  metadata:
+    owner: platform
+  policies:
+    - default
+  deletionPolicy: Orphan

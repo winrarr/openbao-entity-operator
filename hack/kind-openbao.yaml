@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openbao
+  namespace: ${OPENBAO_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: openbao
+    app.kubernetes.io/managed-by: openbao-entity-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: openbao
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: openbao
+    spec:
+      containers:
+        - name: openbao
+          image: ${OPENBAO_IMAGE}
+          imagePullPolicy: IfNotPresent
+          command:
+            - bao
+          args:
+            - server
+            - -dev
+            - -dev-listen-address=0.0.0.0:8200
+            - -dev-no-store-token
+          env:
+            - name: BAO_DEV_ROOT_TOKEN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ${OPENBAO_TOKEN_SECRET}
+                  key: ${OPENBAO_TOKEN_KEY}
+            - name: BAO_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ${OPENBAO_TOKEN_SECRET}
+                  key: ${OPENBAO_TOKEN_KEY}
+          ports:
+            - name: http
+              containerPort: 8200
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /v1/sys/health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /v1/sys/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openbao
+  namespace: ${OPENBAO_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: openbao
+    app.kubernetes.io/managed-by: openbao-entity-operator
+spec:
+  selector:
+    app.kubernetes.io/name: openbao
+  ports:
+    - name: http
+      port: 8200
+      targetPort: http
+      protocol: TCP

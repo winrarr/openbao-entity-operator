@@ -1,0 +1,12 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  labels:
+    app.kubernetes.io/name: openbao-entity-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: openbaoconnection-sample
+spec:
+  address: https://openbao.example.com:8200
+  tokenSecretRef:
+    name: openbao-token
+    key: token

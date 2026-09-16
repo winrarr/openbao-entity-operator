@@ -1,0 +1,43 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections
+  - openbaoentities
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections/finalizers
+  - openbaoentities/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoconnections/status
+  - openbaoentities/status
+  verbs:
+  - get
+  - patch
+  - update
