@@ -2,6 +2,8 @@
 
 Kubernetes-native lifecycle management for OpenBao ACL policies and identity entities and groups.
 
+[Documentation](https://winrarr.github.io/openbao-entity-operator/) · [GitHub repository](https://github.com/winrarr/openbao-entity-operator)
+
 The current vertical slice gives platform teams a declarative boundary around one OpenBao instance and its identity resources:
 
 ```text

@@ -11,7 +11,31 @@ repo_name = "winrarr/openbao-entity-operator"
 edit_uri = "edit/main/docs/"
 strict = true
 nav = [
-  { "Overview" = "index.md" },
+  { "Introduction" = [
+    { "Overview" = "index.md" },
+    { "Quickstart" = "quickstart.md" },
+    { "Installation" = "introduction/installation.md" },
+    { "Concepts" = "introduction/concepts.md" },
+    { "FAQ" = "introduction/faq.md" },
+  ] },
+  { "Guides" = [
+    { "Connection Patterns" = "reference/connection-patterns.md" },
+    { "Deletion and Ownership" = "reference/deletion-and-ownership.md" },
+    { "Troubleshooting" = "reference/troubleshooting.md" },
+    { "Examples" = [
+      { "Overview" = "examples/index.md" },
+      { "Connection and Identity" = "examples/connection-and-identity.md" },
+    ] },
+  ] },
+  { "Resource Guides" = [
+    { "Overview" = "crds/index.md" },
+    { "OpenBaoConnection" = "crds/openbao-connection.md" },
+    { "OpenBaoPolicy" = "crds/openbao-policy.md" },
+    { "OpenBaoEntity" = "crds/openbao-entity.md" },
+    { "OpenBaoEntityAlias" = "crds/openbao-entity-alias.md" },
+    { "OpenBaoGroup" = "crds/openbao-group.md" },
+    { "OpenBaoGroupMembership" = "crds/openbao-group-membership.md" },
+  ] },
   { "Product" = [
     { "Product Scope" = "product.md" },
     { "User Stories" = "user-stories.md" },
@@ -28,6 +52,11 @@ nav = [
     { "Kubernetes Auth" = "operations/kubernetes-auth.md" },
   ] },
   { "Reference" = [
+    { "Reference" = "reference/index.md" },
+    { "Resource Index" = "reference/resources.md" },
+    { "Status and Conditions" = "reference/status-and-conditions.md" },
+    { "Deletion and Ownership" = "reference/deletion-and-ownership.md" },
+    { "Operator Configuration" = "reference/operator-configuration.md" },
     { "Generated API Reference" = "reference/api.md" },
     { "OpenBao API Research" = "research/2026-09-16-openbao-api.md" },
     { "Verification" = "verification.md" },
