@@ -126,6 +126,10 @@ reset_remote_test_objects() {
     e2e-orphan e2e-missing-connection e2e-missing-secret; do
     openbao_cli delete "identity/entity/name/${name}" >/dev/null 2>&1 || true
   done
+
+  for name in e2e-policy e2e-policy-conflict e2e-policy-adopt e2e-policy-orphan e2e-policy-delete; do
+    openbao_cli delete "sys/policies/acl/${name}" >/dev/null 2>&1 || true
+  done
 }
 
 reset_remote_test_namespaces() {
@@ -193,6 +197,14 @@ path "identity/group/*" {
 path "identity/group" {
   capabilities = ["create", "read", "update", "delete", "list"]
 }
+
+path "sys/policies/acl/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "sys/policies/acl" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
 EOF
 
   openbao_cli write auth/kubernetes/role/e2e-operator \
@@ -221,6 +233,32 @@ remote_alias() {
 remote_group() {
   local id="$1"
   openbao_cli read -format=json "identity/group/id/${id}"
+}
+
+remote_policy() {
+  local name="$1"
+  openbao_cli read -format=json "sys/policies/acl/${name}"
+}
+
+assert_remote_policy() {
+  local name="$1"
+  local expected_rules="$2"
+  remote_policy "${name}" | jq -e --arg name "${name}" --arg rules "${expected_rules}" \
+    '.data.name == $name and (.data.policy | rtrimstr("\n")) == ($rules | rtrimstr("\n"))' >/dev/null
+}
+
+wait_for_remote_policy() {
+  local name="$1"
+  local expected_rules="$2"
+  for _ in {1..90}; do
+    if assert_remote_policy "${name}" "${expected_rules}"; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "OpenBao policy ${name} did not reach the expected rules" >&2
+  remote_policy "${name}" >&2 || true
+  return 1
 }
 
 assert_remote_entity() {
@@ -374,6 +412,136 @@ spec:
     role: e2e-operator
 EOF
 wait_ready openbaoconnection/openbao
+
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPolicy
+metadata:
+  name: e2e-policy
+spec:
+  connectionRef:
+    name: openbao
+  deletionPolicy: Delete
+  rules: |
+    path "identity/entity/name/e2e-policy" {
+      capabilities = ["read"]
+    }
+  driftDetectionInterval: 5s
+EOF
+wait_ready openbaopolicy/e2e-policy
+policy_hash="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaopolicy/e2e-policy -o jsonpath='{.status.rulesHash}')"
+[[ -n "${policy_hash}" ]] || { echo "created policy did not publish a rules hash" >&2; exit 1; }
+policy_version="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaopolicy/e2e-policy -o jsonpath='{.status.version}')"
+[[ "${policy_version}" =~ ^[1-9][0-9]*$ ]] || { echo "created policy version = ${policy_version}, want a positive version" >&2; exit 1; }
+wait_for_remote_policy e2e-policy 'path "identity/entity/name/e2e-policy" {
+  capabilities = ["read"]
+}'
+
+kubectl_cmd -n "${TEST_NAMESPACE}" patch openbaopolicy/e2e-policy --type=merge \
+  -p '{"spec":{"rules":"path \"identity/entity/name/e2e-policy\" { capabilities = [\"read\", \"list\"] }"}}' >/dev/null
+next_policy_version=$((policy_version + 1))
+wait_for_jsonpath openbaopolicy/e2e-policy '{.status.version}' "${next_policy_version}"
+wait_for_remote_policy e2e-policy 'path "identity/entity/name/e2e-policy" { capabilities = ["read", "list"] }'
+
+openbao_cli_stdin policy write e2e-policy - >/dev/null <<'EOF'
+path "identity/entity/name/e2e-policy" {
+  capabilities = ["deny"]
+}
+EOF
+wait_for_remote_policy e2e-policy 'path "identity/entity/name/e2e-policy" { capabilities = ["read", "list"] }'
+
+openbao_cli delete sys/policies/acl/e2e-policy >/dev/null
+wait_for_remote_policy e2e-policy 'path "identity/entity/name/e2e-policy" { capabilities = ["read", "list"] }'
+
+openbao_cli_stdin policy write e2e-policy-conflict - >/dev/null <<'EOF'
+path "identity/entity/name/e2e-policy-conflict" {
+  capabilities = ["read"]
+}
+EOF
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPolicy
+metadata:
+  name: e2e-policy-conflict
+spec:
+  connectionRef:
+    name: openbao
+  rules: |
+    path "identity/entity/name/e2e-policy-conflict" {
+      capabilities = ["list"]
+    }
+EOF
+wait_for_condition_reason openbaopolicy/e2e-policy-conflict PolicyAcquireFailed
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaopolicy/e2e-policy-conflict --wait=true >/dev/null
+openbao_cli delete sys/policies/acl/e2e-policy-conflict >/dev/null
+
+openbao_cli_stdin policy write e2e-policy-adopt - >/dev/null <<'EOF'
+path "identity/entity/name/e2e-policy-adopt" {
+  capabilities = ["read"]
+}
+EOF
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPolicy
+metadata:
+  name: e2e-policy-adopt
+spec:
+  connectionRef:
+    name: openbao
+  creationPolicy: Adopt
+  rules: |
+    path "identity/entity/name/e2e-policy-adopt" {
+      capabilities = ["list"]
+    }
+EOF
+wait_ready openbaopolicy/e2e-policy-adopt
+wait_for_remote_policy e2e-policy-adopt 'path "identity/entity/name/e2e-policy-adopt" {
+  capabilities = ["list"]
+}'
+
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPolicy
+metadata:
+  name: e2e-policy-orphan
+spec:
+  connectionRef:
+    name: openbao
+  deletionPolicy: Orphan
+  rules: |
+    path "identity/entity/name/e2e-policy-orphan" {
+      capabilities = ["read"]
+    }
+EOF
+wait_ready openbaopolicy/e2e-policy-orphan
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaopolicy/e2e-policy-orphan --wait=true >/dev/null
+wait_for_remote_policy e2e-policy-orphan 'path "identity/entity/name/e2e-policy-orphan" {
+  capabilities = ["read"]
+}'
+openbao_cli delete sys/policies/acl/e2e-policy-orphan >/dev/null
+
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPolicy
+metadata:
+  name: e2e-policy-delete
+spec:
+  connectionRef:
+    name: openbao
+  deletionPolicy: Delete
+  rules: |
+    path "identity/entity/name/e2e-policy-delete" {
+      capabilities = ["read"]
+    }
+EOF
+wait_ready openbaopolicy/e2e-policy-delete
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaopolicy/e2e-policy-delete --wait=true >/dev/null
+if remote_policy e2e-policy-delete >/dev/null 2>&1; then
+  echo "OpenBao policy e2e-policy-delete still exists after Delete-policy cleanup" >&2
+  exit 1
+fi
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaopolicy/e2e-policy-adopt --wait=true >/dev/null
+openbao_cli delete sys/policies/acl/e2e-policy-adopt >/dev/null
 
 cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1

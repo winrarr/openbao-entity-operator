@@ -2,6 +2,7 @@
 resources:
 - openbao_v1alpha1_openbaoconnection.yaml
 - openbao_v1alpha1_openbaoconnection_kubernetes_auth.yaml
+- openbao_v1alpha1_openbaopolicy.yaml
 - openbao_v1alpha1_openbaoentity.yaml
 - openbao_v1alpha1_openbaoentityalias.yaml
 - openbao_v1alpha1_openbaogroup.yaml

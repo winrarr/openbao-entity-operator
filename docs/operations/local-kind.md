@@ -18,6 +18,7 @@ The target builds the operator image, installs the committed Helm chart, and the
 - builds and loads the operator image;
 - installs the generated CRDs and operator manifests;
 - verifies connection health and token authentication;
+- verifies ACL policy creation, exact document updates, external drift recovery, adoption, conflict protection, orphaning, and opt-in deletion;
 - verifies entity creation, status ID persistence, metadata/policy/disabled-state updates, external deletion recovery, adoption, conflict protection, orphaning, and opt-in deletion;
 - verifies alias creation, canonical-entity drift correction, adoption, conflict protection, orphaning, and opt-in deletion;
 - verifies group creation, entity and subgroup membership, preservation of an unmanaged remote member, membership-claim removal, and opt-in group deletion;
@@ -46,7 +47,7 @@ Failed runs preserve the test namespace so status and logs remain available:
 
 ```sh
 kubectl --context kind-openbao-entity-operator get pods -A
-kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaoentities,openbaogroups,openbaogroupmemberships -n openbao-entity-operator-e2e
+kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaopolicies,openbaoentities,openbaogroups,openbaogroupmemberships -n openbao-entity-operator-e2e
 kubectl --context kind-openbao-entity-operator describe openbaoentity/e2e-created -n openbao-entity-operator-e2e
 kubectl --context kind-openbao-entity-operator logs deployment/openbao-entity-operator -n openbao-entity-operator-system
 ```
@@ -57,7 +58,7 @@ After inspection, remove only the retained E2E resources with the dependency-awa
 make kind-e2e-clean
 ```
 
-The cleanup target deletes membership claims, aliases, groups, entities, and connections in that order, then removes the test namespace. It stops if a resource remains blocked by a non-recoverable finalizer so the failure is visible. It does not delete external OpenBao objects that were left behind after a missing connection or credential.
+The cleanup target deletes membership claims, aliases, policies, groups, entities, and connections in that order, then removes the test namespace. It stops if a resource remains blocked by a non-recoverable finalizer so the failure is visible. It does not delete external OpenBao objects that were left behind after a missing connection or credential.
 
 Set `KEEP_TEST_RESOURCES=true` to retain the namespace after a successful run too. Do not print or copy the `openbao-dev-token` Secret.
 

@@ -15,6 +15,7 @@ Primary sources:
 - [OpenBao identity concepts](https://openbao.org/docs/next/concepts/identity/)
 - [OpenBao Kubernetes Auth](https://openbao.org/docs/next/auth/kubernetes/)
 - [OpenBao token auth API](https://openbao.org/docs/2.4.x/api/auth/token/)
+- [OpenBao ACL policy API](https://openbao.org/docs/2.4.x/api/system/policies/)
 
 ## Observations
 
@@ -31,6 +32,7 @@ Primary sources:
 - In the verified OpenBao v2.6.2 Kind instance, `GET /v1/sys/health` with a namespace header returned HTTP 400 (`operation unavailable in namespaces`), while namespaced token self-lookup remained available. The connection controller therefore uses health checks for root connections and namespaced token self-lookup for namespace-scoped readiness.
 - OpenBao's Kubernetes Auth login endpoint is `POST /v1/auth/<mount>/login` (the default mount is `kubernetes`). It accepts a role and Kubernetes ServiceAccount JWT and returns an `auth.client_token` with lease duration and renewability metadata. The mount must be enabled and configured by the OpenBao administrator before the operator can use it.
 - The token API exposes `POST /v1/auth/token/renew-self` for renewing the current token. The client uses that endpoint before a renewable lease expires and falls back to a fresh Kubernetes Auth login when renewal fails or a request is rejected.
+- OpenBao ACL policies are managed through `GET`, `POST`, and `DELETE /v1/sys/policies/acl/:name`; the list endpoint is `/v1/sys/policies/acl`. Reads return the document in `data.policy` and include the policy name and version. Writes send the document in a `policy` request field.
 
 ## Generated reference
 
@@ -40,7 +42,7 @@ The checked-in [`hack/openbao-openapi.json`](../../hack/openbao-openapi.json) wa
 8dc11cc5fca0b539a9e352727dacb4e2d304daffcf9a66e0718ac325a20d05aa
 ```
 
-The resulting document is OpenAPI 3.0.2, contains 231 paths and includes the identity entity, alias, and group endpoints used by this project, and has SHA-256:
+The resulting document is OpenAPI 3.0.2, contains 231 paths and includes the identity entity, alias, group, and ACL policy endpoints used by this project, and has SHA-256:
 
 ```text
 82f689cc39f60992e25f786c5737bb784f9bfe3c8c50006aa6cee8102aa2ec3d
@@ -55,6 +57,8 @@ The resulting document is OpenAPI 3.0.2, contains 231 paths and includes the ide
 - The checked-in runtime OpenAPI snapshot does not include the Kubernetes Auth login route because the snapshot was captured before that plugin mount was enabled. The route is therefore tracked against the official auth documentation and covered by focused HTTP contract tests rather than added as an unavailable snapshot path.
 - A small typed client is sufficient for the current entity and connection stories and keeps unrelated secret-engine APIs outside the initial dependency surface.
 - Namespace targeting belongs on `OpenBaoConnection` because it changes the API and credential context for every resource using that connection. The operator therefore validates and applies one header in the shared client rather than duplicating namespace handling across controllers.
+- The user-facing policy field is named `rules` while the typed client maps it to OpenBao's `policy` field. This keeps the Kubernetes resource clear without hiding the OpenBao wire contract.
+- A policy resource does not need a generated external ID: the OpenBao policy name is the immutable Kubernetes resource name, while status version and hash provide useful observed identity and drift evidence.
 
 ## Unresolved questions
 

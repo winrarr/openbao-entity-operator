@@ -36,6 +36,8 @@ const (
 	clientMountAccessor   = "auth_kubernetes_123"
 	clientGroupID         = "group-1"
 	clientGroupName       = "platform"
+	clientPolicyName      = "payments"
+	clientPolicyRules     = "path \"identity/*\" { capabilities = [\"read\"] }"
 	testAuthRole          = "operator"
 	testJWT               = "jwt-1"
 	testLookupSelfPath    = "/v1/auth/token/lookup-self"
@@ -415,6 +417,49 @@ func TestGroupClientUsesOpenBaoGroupEndpoints(t *testing.T) {
 		t.Fatalf("updated group/body = %#v/%#v, want group-1/entity-2", updated, requestBody)
 	}
 	if err := apiClient.DeleteGroup(context.Background(), clientGroupID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPolicyClientUsesOpenBaoPolicyEndpoints(t *testing.T) {
+	var requestBody map[string]string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v1/sys/policies/acl/"+clientPolicyName {
+			t.Fatalf("path = %q, want policy endpoint", request.URL.Path)
+		}
+		switch request.Method {
+		case http.MethodGet:
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprintf(writer, `{"data":{"name":%q,"policy":%q,"version":2}}`, clientPolicyName, clientPolicyRules)
+		case http.MethodPost:
+			decodeRequestBody(t, request, &requestBody)
+			writer.WriteHeader(http.StatusNoContent)
+		case http.MethodDelete:
+			writer.WriteHeader(http.StatusNoContent)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	apiClient, err := New(server.URL, "test-token", time.Second, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	policy, err := apiClient.GetPolicy(context.Background(), clientPolicyName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if policy.Name != clientPolicyName || policy.Rules != clientPolicyRules || policy.Version != 2 {
+		t.Fatalf("policy = %#v, want name/rules/version", policy)
+	}
+	if err := apiClient.WritePolicy(context.Background(), clientPolicyName, PolicyRequest{Rules: clientPolicyRules}); err != nil {
+		t.Fatal(err)
+	}
+	if requestBody["policy"] != clientPolicyRules {
+		t.Fatalf("write body = %#v, want policy document", requestBody)
+	}
+	if err := apiClient.DeletePolicy(context.Background(), clientPolicyName); err != nil {
 		t.Fatal(err)
 	}
 }

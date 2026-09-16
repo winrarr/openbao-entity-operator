@@ -30,6 +30,6 @@ Exit criteria: define the supported OpenBao version policy and run the live cont
 
 Status: accepted limitation
 
-If a Delete-policy entity, alias, or group loses its `OpenBaoConnection` or credential Secret before its Kubernetes deletion is reconciled, the operator logs the loss and releases the finalizer to prevent a stuck Kubernetes object. This preserves cluster recoverability but cannot prove that the external object was deleted.
+If a Delete-policy entity, alias, group, or ACL policy loses its `OpenBaoConnection` or credential Secret before its Kubernetes deletion is reconciled, the operator logs the loss and releases the finalizer to prevent a stuck Kubernetes object. This preserves cluster recoverability but cannot prove that the external object was deleted.
 
 Exit criteria: introduce a recoverable connection and credential lifecycle that preserves cleanup access during dependent-resource deletion, then add live coverage proving external deletion remains possible after dependency ordering changes.

@@ -7,6 +7,7 @@ Kubernetes API
     │
     ├── OpenBaoConnectionReconciler ──┐
     │                                 │
+    ├── OpenBaoPolicyReconciler ──────┤
     ├── OpenBaoEntityReconciler ──────┤
     ├── OpenBaoEntityAliasReconciler ─┤
     └── OpenBaoGroupReconciler ──────┼── internal/openbaoclient ── OpenBao HTTP API
@@ -27,6 +28,22 @@ The controller watches referenced Secrets when token authentication or a CA bund
 `OpenBaoEntityReconciler` resolves a ready connection before making external calls. It uses the recorded status ID as the stable binding after creation or adoption. If no ID exists, it looks up the entity by name and applies the creation policy. Once bound, it reads by ID, refuses an unexpected name mismatch, updates only when the desired state differs, and records the observed state in status.
 
 `OpenBaoEntityAliasReconciler` resolves both the connection and a ready `OpenBaoEntity`, then binds the alias to the entity's current stable ID. OpenBao has no direct alias lookup by name and mount accessor, so initial adoption scans the alias ID list and reads candidates before applying the explicit creation policy. Once bound, the alias ID remains stable; external canonical-entity drift is corrected and changes to the referenced entity ID are propagated.
+
+## Policy flow
+
+`OpenBaoPolicyReconciler` uses the Kubernetes resource name as the OpenBao ACL
+policy name and reconciles the exact raw document in `spec.rules` through
+`/v1/sys/policies/acl/<name>`. A status name marks a policy already acquired by
+the resource, so later reconciliations do not confuse its own managed policy
+with an unrelated pre-existing policy. Initial existing policies require
+`Adopt` or `CreateOrAdopt`; otherwise the controller reports a conflict without
+overwriting the document. Status records a SHA-256 hash and OpenBao version,
+while the document itself remains in spec and is not duplicated into status.
+
+Policy deletion is orphaning by default and requires `deletionPolicy: Delete` to
+call OpenBao. The controller watches its connection and uses the same shared
+client/cache as the identity controllers, including Kubernetes Auth lease
+handling and namespace routing.
 
 ## Group and membership flow
 

@@ -160,6 +160,14 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoconnection")
 		os.Exit(1)
 	}
+	if err := (&openbaocontroller.OpenBaoPolicyReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaopolicy")
+		os.Exit(1)
+	}
 	if err := (&openbaocontroller.OpenBaoEntityReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),

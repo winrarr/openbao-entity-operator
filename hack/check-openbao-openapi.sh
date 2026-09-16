@@ -8,4 +8,5 @@ jq -e '.openapi == "3.0.2" and .info.title == "OpenBao API" and (.paths | type =
 jq -e '(.paths | has("/identity/entity")) and (.paths | has("/identity/entity/id/{id}")) and (.paths | has("/identity/entity/name/{name}"))' "$spec_path" >/dev/null
 jq -e '(.paths | has("/identity/entity-alias")) and (.paths | has("/identity/entity-alias/id")) and (.paths | has("/identity/entity-alias/id/{id}"))' "$spec_path" >/dev/null
 jq -e '(.paths | has("/identity/group")) and (.paths | has("/identity/group/id/{id}")) and (.paths | has("/identity/group/name/{name}"))' "$spec_path" >/dev/null
+jq -e '(.paths | has("/sys/policies/acl")) and (.paths | has("/sys/policies/acl/{name}"))' "$spec_path" >/dev/null
 echo "Validated OpenBao OpenAPI reference: $spec_path"

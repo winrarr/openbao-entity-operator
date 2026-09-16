@@ -1,0 +1,11 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPolicy
+metadata:
+  name: payments
+spec:
+  connectionRef:
+    name: openbao
+  rules: |
+    path "identity/*" {
+      capabilities = ["read"]
+    }

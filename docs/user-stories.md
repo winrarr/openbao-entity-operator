@@ -2,7 +2,7 @@
 
 ## Context
 
-The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers token- and Kubernetes-authenticated connections, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
+The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers token- and Kubernetes-authenticated connections, ACL policy lifecycle, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
 
 ## Current stories
 
@@ -116,9 +116,23 @@ Acceptance criteria:
 
 Design criteria: authentication belongs to `OpenBaoConnection`, the client owns login/renew/retry behavior, JWT material is read only from the projected ServiceAccount file, auth mount paths are explicit and validated, and token or JWT values never enter status, errors, logs, or test fixtures.
 
+### US-009 — Manage an OpenBao ACL policy declaratively
+
+As a platform operator, I want to declare an OpenBao ACL policy document as a Kubernetes resource, so that authorization rules are versioned and continuously reconciled with the same connection and ownership controls as identity resources.
+
+Acceptance criteria:
+
+- Given a ready connection and an absent policy, when an `OpenBaoPolicy` is reconciled with `creationPolicy=Create`, then OpenBao contains a policy named after the Kubernetes resource and the resource reports `Ready=True` with its observed version and rules hash.
+- Given an existing policy, when `creationPolicy=Create`, then reconciliation reports a conflict and does not overwrite the document; `Adopt` and `CreateOrAdopt` explicitly allow management.
+- Given a managed policy whose OpenBao document changes or is deleted externally, when drift detection runs, then the declared `spec.rules` document is restored.
+- Given `deletionPolicy=Orphan`, when the Kubernetes resource is deleted, then the OpenBao policy remains; given `deletionPolicy=Delete`, then the policy is removed before the finalizer is released.
+- Given the referenced connection or credential Secret is already absent during Delete-policy cleanup, then the controller releases the finalizer with an explicit dependency-loss warning rather than leaving Kubernetes deletion stuck.
+
+Design criteria: same-namespace immutable connection reference, Kubernetes resource name as the stable OpenBao policy name, exact raw HCL or JSON document comparison, status hash/version instead of duplicating the full policy, explicit create/adopt and deletion policy, typed ACL endpoints only, and live Kubernetes Auth coverage.
+
 ## Future stories
 
-### US-009 — Authenticate with additional OpenBao machine-auth methods
+### US-010 — Authenticate with additional OpenBao machine-auth methods
 
 As a platform operator, I want to use another OpenBao machine-auth method such as AppRole when Kubernetes Auth is not available, so that the operator can integrate with existing deployment boundaries.
 
@@ -138,7 +152,8 @@ Design constraint: future methods should extend the connection authentication mo
 | US-006 | Current | Covered now | Covered now | Group membership is an explicit owned edge while the typed client models OpenBao's group-level update API |
 | US-007 | Current | Covered now | Supported later | The typed client applies one validated namespace header to every request |
 | US-008 | Current | Covered now | Supported later | Authentication is selected at connection construction while identity controllers keep a narrow client interface |
-| US-009 | Future | Supported later | Supported later | Additional methods can share the connection boundary, but each needs an explicit credential and rotation contract |
+| US-009 | Current | Covered now | Supported later | A typed policy client keeps the raw document and ownership semantics visible without exposing arbitrary system paths |
+| US-010 | Future | Supported later | Supported later | Additional methods can share the connection boundary, but each needs an explicit credential and rotation contract |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.
 

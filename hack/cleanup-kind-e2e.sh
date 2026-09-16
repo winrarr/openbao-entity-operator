@@ -16,7 +16,7 @@ if ! kubectl_cmd get namespace "${TEST_NAMESPACE}" >/dev/null 2>&1; then
   exit 0
 fi
 
-for resource in openbaogroupmemberships openbaoentityaliases openbaogroups openbaoentities openbaoconnections; do
+for resource in openbaogroupmemberships openbaoentityaliases openbaopolicies openbaogroups openbaoentities openbaoconnections; do
   echo "Deleting ${resource} in ${TEST_NAMESPACE}"
   kubectl_cmd -n "${TEST_NAMESPACE}" delete "${resource}" --all --ignore-not-found=true --wait=true --timeout="${DELETE_TIMEOUT}" >/dev/null
 done

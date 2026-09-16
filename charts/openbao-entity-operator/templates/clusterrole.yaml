@@ -20,6 +20,7 @@ rules:
   - openbaoentities
   - openbaoentityaliases
   - openbaogroups
+  - openbaopolicies
   verbs:
   - create
   - delete
@@ -35,6 +36,7 @@ rules:
   - openbaoentities/finalizers
   - openbaoentityaliases/finalizers
   - openbaogroups/finalizers
+  - openbaopolicies/finalizers
   verbs:
   - update
 - apiGroups:
@@ -45,6 +47,7 @@ rules:
   - openbaoentityaliases/status
   - openbaogroupmemberships/status
   - openbaogroups/status
+  - openbaopolicies/status
   verbs:
   - get
   - patch

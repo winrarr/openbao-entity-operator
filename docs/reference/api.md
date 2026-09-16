@@ -14,6 +14,7 @@ Package v1alpha1 contains API Schema definitions for the openbao v1alpha1 API gr
 - [OpenBaoEntityAlias](#openbaoentityalias)
 - [OpenBaoGroup](#openbaogroup)
 - [OpenBaoGroupMembership](#openbaogroupmembership)
+- [OpenBaoPolicy](#openbaopolicy)
 
 
 
@@ -29,6 +30,7 @@ _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 - [OpenBaoGroupSpec](#openbaogroupspec)
+- [OpenBaoPolicySpec](#openbaopolicyspec)
 
 | Field | Description |
 | --- | --- |
@@ -49,6 +51,7 @@ _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 - [OpenBaoGroupSpec](#openbaogroupspec)
+- [OpenBaoPolicySpec](#openbaopolicyspec)
 
 | Field | Description |
 | --- | --- |
@@ -105,6 +108,7 @@ _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 - [OpenBaoGroupSpec](#openbaogroupspec)
+- [OpenBaoPolicySpec](#openbaopolicyspec)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -336,6 +340,44 @@ _Appears in:_
 | --- | --- |
 | `Internal` |  |
 | `External` |  |
+
+
+#### OpenBaoPolicy
+
+
+
+OpenBaoPolicy is the Schema for the openbaopolicies API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `openbao.openbao-operator.io/v1alpha1` | | |
+| `kind` _string_ | `OpenBaoPolicy` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  | Optional: \{\} <br /> |
+| `spec` _[OpenBaoPolicySpec](#openbaopolicyspec)_ | spec defines the desired state of OpenBaoPolicy |  | Required: \{\} <br /> |
+
+
+#### OpenBaoPolicySpec
+
+
+
+OpenBaoPolicySpec defines the desired state of an OpenBao ACL policy.
+
+
+
+_Appears in:_
+- [OpenBaoPolicy](#openbaopolicy)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `connectionRef` _[OpenBaoConnectionReference](#openbaoconnectionreference)_ | ConnectionRef selects the OpenBao API connection in the same namespace. |  |  |
+| `creationPolicy` _[CreationPolicy](#creationpolicy)_ | CreationPolicy controls how an external policy is acquired. | Create | Enum: [Create Adopt CreateOrAdopt] <br />Optional: \{\} <br /> |
+| `deletionPolicy` _[DeletionPolicy](#deletionpolicy)_ | DeletionPolicy controls whether the external policy is deleted with this resource. | Orphan | Enum: [Delete Orphan] <br />Optional: \{\} <br /> |
+| `driftDetectionInterval` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | DriftDetectionInterval controls periodic checks for changes made outside Kubernetes.<br />A zero duration disables periodic checks. When omitted, the operator default is used. |  | Optional: \{\} <br /> |
+| `rules` _string_ | Rules is the raw HCL or JSON OpenBao ACL policy document. |  | MinLength: 1 <br /> |
 
 
 #### SecretKeyReference

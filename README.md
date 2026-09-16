@@ -1,14 +1,14 @@
 # OpenBao Entity Operator
 
-Kubernetes-native lifecycle management for OpenBao identity entities and groups.
+Kubernetes-native lifecycle management for OpenBao ACL policies and identity entities and groups.
 
 The current vertical slice gives platform teams a declarative boundary around one OpenBao instance and its identity resources:
 
 ```text
-Kubernetes Secret → OpenBaoConnection → OpenBaoEntity / OpenBaoGroup → membership claims
+Kubernetes Secret → OpenBaoConnection → OpenBaoPolicy / OpenBaoEntity / OpenBaoGroup → membership claims
 ```
 
-The operator validates connectivity, reconciles entity metadata, policies, and disabled state, binds auth-method aliases to entities, manages internal groups and explicit membership edges, reports stable external IDs in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
+The operator validates connectivity, reconciles named ACL policy documents, entity metadata, policies, and disabled state, binds auth-method aliases to entities, manages internal groups and explicit membership edges, reports stable external IDs in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
 
 ## Quick start
 
@@ -72,6 +72,12 @@ spec:
 The client renews renewable auth tokens and performs one fresh login retry after
 OpenBao rejects a token. See the [Kubernetes Auth operations guide](docs/operations/kubernetes-auth.md)
 for the OpenBao-side setup and rotation considerations.
+
+An `OpenBaoPolicy` uses its Kubernetes `metadata.name` as the OpenBao ACL policy
+name and sends the raw HCL or JSON document in `spec.rules` to OpenBao. Policies
+default to explicit creation and orphaning; use `creationPolicy: Adopt` when an
+existing policy should be managed and `deletionPolicy: Delete` only when deleting
+the Kubernetes resource should remove the OpenBao policy.
 
 An `OpenBaoEntityAlias` references the entity resource, an OpenBao auth-method mount accessor, and the alias name presented by that auth method. Its `status.canonicalID` records the bound entity ID; aliases default to safe orphaning and can opt into external deletion.
 

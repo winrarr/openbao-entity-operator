@@ -46,6 +46,9 @@ const (
 	testOpenBaoAddress     = "https://openbao.example.test"
 	testTokenKey           = "token"
 	testOpenBaoVersion     = "2.6.2"
+	testPolicyName         = "payments-policy"
+	testPolicyRules        = "path \"identity/*\" { capabilities = [\"read\"] }"
+	testPolicyUpdatedRules = "path \"identity/entity/name/payments\" { capabilities = [\"read\", \"list\"] }"
 )
 
 func TestEntityReconcilerCreatesAndPersistsIdentity(t *testing.T) {
@@ -365,6 +368,8 @@ func newTestClient(objects ...client.Object) client.Client {
 			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoGroup"}
 		case *openbaov1alpha1.OpenBaoGroupMembership:
 			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoGroupMembership"}
+		case *openbaov1alpha1.OpenBaoPolicy:
+			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoPolicy"}
 		}
 	}
 	runtimeObjects := make([]runtime.Object, 0, len(objects))
@@ -372,7 +377,7 @@ func newTestClient(objects ...client.Object) client.Client {
 		runtimeObjects = append(runtimeObjects, object)
 	}
 	result := fake.NewClientBuilder().WithScheme(scheme).
-		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}, &openbaov1alpha1.OpenBaoGroup{}, &openbaov1alpha1.OpenBaoGroupMembership{}).
+		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}, &openbaov1alpha1.OpenBaoGroup{}, &openbaov1alpha1.OpenBaoGroupMembership{}, &openbaov1alpha1.OpenBaoPolicy{}).
 		WithRuntimeObjects(runtimeObjects...).Build()
 	return result
 }
@@ -475,3 +480,40 @@ func (f *fakeEntityClient) UpdateEntity(_ context.Context, id string, request op
 }
 
 func (f *fakeEntityClient) DeleteEntity(context.Context, string) error { return nil }
+
+type fakePolicyClient struct {
+	policies    map[string]*openbaoclient.Policy
+	writeCalls  int
+	deleteCalls int
+}
+
+func (f *fakePolicyClient) GetPolicy(_ context.Context, name string) (*openbaoclient.Policy, error) {
+	policy, ok := f.policies[name]
+	if !ok {
+		return nil, &openbaoclient.HTTPError{StatusCode: 404}
+	}
+	copy := *policy
+	return &copy, nil
+}
+
+func (f *fakePolicyClient) WritePolicy(_ context.Context, name string, request openbaoclient.PolicyRequest) error {
+	if f.policies == nil {
+		f.policies = make(map[string]*openbaoclient.Policy)
+	}
+	f.writeCalls++
+	version := int64(1)
+	if current, ok := f.policies[name]; ok {
+		version = current.Version + 1
+	}
+	f.policies[name] = &openbaoclient.Policy{Name: name, Rules: request.Rules, Version: version}
+	return nil
+}
+
+func (f *fakePolicyClient) DeletePolicy(_ context.Context, name string) error {
+	f.deleteCalls++
+	if _, ok := f.policies[name]; !ok {
+		return &openbaoclient.HTTPError{StatusCode: 404}
+	}
+	delete(f.policies, name)
+	return nil
+}
