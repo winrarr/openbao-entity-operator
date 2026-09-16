@@ -32,6 +32,7 @@ reconciliation loops.
 ## Project knowledge
 
 - [Product scope](product.md)
+- [Compatibility policy](compatibility.md)
 - [Architecture](architecture.md)
 - [User stories](user-stories.md)
 - [Decisions](decisions/index.md)

@@ -156,7 +156,7 @@ make kind-e2e
 make kind-down
 ```
 
-`make check` regenerates CRDs, deepcopy code, chart assets, and the CRD API reference, checks formatting, runs vet and unit tests, runs lint and Helm chart checks, validates the checked-in OpenBao OpenAPI reference, renders the installation manifests, and builds the strict documentation site. `make kind-e2e` builds the operator, installs its Helm chart, and tests the live OpenBao lifecycle in an isolated Kind cluster. See [the documentation map](docs/index.md) for product scope, design stories, architecture, operations, research, and verification details. Repository operating rules live in [AGENTS.md](AGENTS.md).
+`make check` regenerates CRDs, deepcopy code, chart assets, and the CRD API reference, checks formatting, runs vet and unit tests, runs lint and Helm chart checks, validates the checked-in OpenBao OpenAPI reference, renders the installation manifests, and builds the strict documentation site. `make kind-e2e` builds the operator, installs its Helm chart, and tests the focused live OpenBao/Kubernetes integration path in an isolated Kind cluster. See [the documentation map](docs/index.md) for product scope, compatibility, design stories, architecture, operations, research, and verification details. Repository operating rules live in [AGENTS.md](AGENTS.md).
 
 ## License
 

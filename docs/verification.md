@@ -16,11 +16,11 @@
 | `make helm-package` | Packages the validated Helm chart, including committed CRDs, into `dist/` | Does not publish the package |
 | `make docs-build` | The generated CRD reference is current and the documentation site passes strict validation | Does not publish the site locally |
 | `make check` | Runs the complete local foundation suite | Does not start external services |
-| `make kind-e2e` | Installs the operator from the Helm chart and runs live Kubernetes Auth connection, policy, entity, alias, group, and membership lifecycle, drift, adoption, conflict, orphan, delete, missing-cleanup-dependency, and namespace-isolation scenarios against OpenBao in Kind | Uses a single in-memory OpenBao dev server; the root token only bootstraps OpenBao and configures the test auth role |
+| `make kind-e2e` | Installs the operator from the Helm chart, verifies CRD/RBAC presence, authenticates through real OpenBao Kubernetes Auth, and exercises one live policy/entity/alias/group-membership graph | Uses a single in-memory OpenBao dev server; controller branches such as adoption, drift, conflicts, deletion policies, and dependency loss are covered by unit and HTTP contract tests |
 | `make kind-e2e-clean` | Removes only the named live E2E test namespace after deleting resources in dependency order | Does not remove external OpenBao objects left by a failed cleanup |
 | `make kind-down` | Removes only the named disposable Kind cluster | Deletes local OpenBao data and test resources |
 
-The unit tests use `httptest.Server` for HTTP contracts and controller-runtime's fake Kubernetes client with injected OpenBao clients for reconciliation. The Kind workflow adds live Kubernetes/OpenBao evidence without making the external cluster part of the ordinary check suite.
+The unit tests use `httptest.Server` for HTTP contracts and controller-runtime's fake Kubernetes client with injected OpenBao clients for reconciliation. The Kind workflow adds focused live Kubernetes/OpenBao evidence without duplicating the controller state machine in raw shell.
 
 ## Evidence rules
 

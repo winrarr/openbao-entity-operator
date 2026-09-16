@@ -39,6 +39,7 @@ nav = [
   { "Product" = [
     { "Product Scope" = "product.md" },
     { "User Stories" = "user-stories.md" },
+    { "Compatibility" = "compatibility.md" },
     { "Backlog" = "backlog.md" },
     { "Tech Debt" = "tech-debt.md" },
   ] },
