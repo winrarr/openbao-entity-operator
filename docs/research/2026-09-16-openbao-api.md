@@ -16,6 +16,7 @@ Primary sources:
 - OpenBao's HTTP API is currently v1 and prefixes routes with `/v1/`.
 - Authenticated requests accept `X-Vault-Token` or an `Authorization: Bearer` header. The OpenBao CLI and SDK also send `X-Vault-Request: true`; the client follows that convention.
 - Identity entity operations include create/update, read by ID, read by name, and delete by ID. The entity request supports `name`, `metadata`, `policies`, and `disabled`.
+- Identity entity-alias operations include create, list IDs, read by ID, update by ID, and delete by ID. Alias requests use `canonical_id`, `mount_accessor`, and `name`; OpenBao does not expose a direct alias lookup by name and mount accessor.
 - The health endpoint can use non-2xx status codes for standby, sealed, or uninitialized states; the response body still carries health information.
 - OpenBao exposes OpenAPI through `/v1/sys/internal/specs/openapi`. The official script starts OpenBao, enables selected built-in plugins, and queries that endpoint with `generic_mount_paths`.
 
@@ -36,10 +37,11 @@ The resulting document is OpenAPI 3.0.2, contains 231 paths and 10 identity-enti
 ## Inferences used by this project
 
 - The operator binds an entity to the ID returned by OpenBao and uses name lookup only for initial adoption or creation. This avoids using a mutable name as the long-term identity.
+- The operator binds an alias to the ID returned by OpenBao and uses the alias ID list plus candidate reads only for initial adoption. This avoids treating the mutable alias name/mount pair as the long-term identity.
 - The OpenAPI snapshot is a semantic reference rather than a generator input because OpenBao generates it at runtime and it can vary with version and enabled mounts.
 - A small typed client is sufficient for the current entity and connection stories and keeps unrelated secret-engine APIs outside the initial dependency surface.
 
 ## Unresolved questions
 
 - The OpenBao documentation warns that v1 compatibility is not yet promised. Future releases need focused contract tests before updating the reference.
-- The first slice does not decide how aliases and group membership should be modeled across multiple auth mounts. Those are future design stories, not hidden current requirements.
+- The current alias resource models one auth mount accessor per alias. Group membership and more complex multi-mount workflows remain future design stories, not hidden current requirements.

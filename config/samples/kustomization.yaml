@@ -2,4 +2,5 @@
 resources:
 - openbao_v1alpha1_openbaoconnection.yaml
 - openbao_v1alpha1_openbaoentity.yaml
+- openbao_v1alpha1_openbaoentityalias.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples

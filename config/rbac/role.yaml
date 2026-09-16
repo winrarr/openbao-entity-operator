@@ -17,6 +17,7 @@ rules:
   resources:
   - openbaoconnections
   - openbaoentities
+  - openbaoentityaliases
   verbs:
   - create
   - delete
@@ -30,6 +31,7 @@ rules:
   resources:
   - openbaoconnections/finalizers
   - openbaoentities/finalizers
+  - openbaoentityaliases/finalizers
   verbs:
   - update
 - apiGroups:
@@ -37,6 +39,7 @@ rules:
   resources:
   - openbaoconnections/status
   - openbaoentities/status
+  - openbaoentityaliases/status
   verbs:
   - get
   - patch

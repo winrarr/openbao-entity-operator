@@ -77,6 +77,11 @@ remote_entity() {
   openbao_cli read -format=json "identity/entity/id/${id}"
 }
 
+remote_alias() {
+  local id="$1"
+  openbao_cli read -format=json "identity/entity-alias/id/${id}"
+}
+
 assert_remote_entity() {
   local id="$1"
   local expected_name="$2"
@@ -96,6 +101,39 @@ assert_remote_absent() {
     echo "OpenBao entity ${id} still exists" >&2
     return 1
   fi
+}
+
+assert_remote_alias() {
+  local id="$1"
+  local expected_name="$2"
+  local expected_accessor="$3"
+  local expected_canonical_id="$4"
+  remote_alias "${id}" | jq -e \
+    --arg id "${id}" --arg name "${expected_name}" --arg accessor "${expected_accessor}" --arg canonical_id "${expected_canonical_id}" \
+    '.data.id == $id and .data.name == $name and .data.mount_accessor == $accessor and .data.canonical_id == $canonical_id' >/dev/null
+}
+
+assert_remote_alias_absent() {
+  local id="$1"
+  if remote_alias "${id}" >/dev/null 2>&1; then
+    echo "OpenBao entity alias ${id} still exists" >&2
+    return 1
+  fi
+}
+
+wait_for_remote_alias_canonical_id() {
+  local id="$1"
+  local expected_canonical_id="$2"
+  for _ in {1..90}; do
+    if remote_alias "${id}" | jq -e --arg canonical_id "${expected_canonical_id}" \
+      '.data.canonical_id == $canonical_id' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  echo "OpenBao entity alias ${id} did not reach canonical ID ${expected_canonical_id}" >&2
+  remote_alias "${id}" >&2 || true
+  return 1
 }
 
 echo "Using Kind context ${KUBE_CONTEXT}"
@@ -122,7 +160,7 @@ spec:
 EOF
 wait_ready openbaoconnection/openbao
 
-cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1
 kind: OpenBaoEntity
 metadata:
@@ -188,6 +226,122 @@ kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentity/e2e-adopt -o json \
   | jq -e --arg id "${adopt_id}" '.status.id == $id' >/dev/null
 assert_remote_entity "${adopt_id}" e2e-adopt adopted
 
+auth_accessor="$(openbao_cli auth list -format=json | jq -er '."token/".accessor')"
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntityAlias
+metadata:
+  name: e2e-alias
+spec:
+  connectionRef:
+    name: openbao
+  entityRef:
+    name: e2e-created
+  mountAccessor: ${auth_accessor}
+  name: e2e-login
+  driftDetectionInterval: 5s
+  deletionPolicy: Delete
+EOF
+wait_ready openbaoentityalias/e2e-alias
+alias_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentityalias/e2e-alias -o jsonpath='{.status.id}')"
+[[ -n "${alias_id}" ]] || { echo "created entity alias did not publish an ID" >&2; exit 1; }
+assert_remote_alias "${alias_id}" e2e-login "${auth_accessor}" "${created_id}"
+
+openbao_cli write "identity/entity-alias/id/${alias_id}" canonical_id="${adopt_id}" >/dev/null
+wait_for_remote_alias_canonical_id "${alias_id}" "${adopt_id}"
+wait_for_remote_alias_canonical_id "${alias_id}" "${created_id}"
+wait_for_jsonpath openbaoentityalias/e2e-alias '{.status.canonicalID}' "${created_id}"
+assert_remote_alias "${alias_id}" e2e-login "${auth_accessor}" "${created_id}"
+
+adopt_alias_id="$(openbao_cli write -format=json identity/entity-alias name=e2e-adopt-login mount_accessor="${auth_accessor}" canonical_id="${adopt_id}" | jq -er '.data.id')"
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntityAlias
+metadata:
+  name: e2e-adopt-alias
+spec:
+  connectionRef:
+    name: openbao
+  entityRef:
+    name: e2e-adopt
+  mountAccessor: ${auth_accessor}
+  name: e2e-adopt-login
+  creationPolicy: Adopt
+  deletionPolicy: Delete
+EOF
+wait_ready openbaoentityalias/e2e-adopt-alias
+kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentityalias/e2e-adopt-alias -o json \
+  | jq -e --arg id "${adopt_alias_id}" '.status.id == $id' >/dev/null
+
+openbao_cli write identity/entity name=e2e-conflict-alias-target policies=default >/dev/null
+conflict_alias_target_id="$(openbao_cli read -format=json identity/entity/name/e2e-conflict-alias-target | jq -er '.data.id')"
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntity
+metadata:
+  name: e2e-conflict-alias-target
+spec:
+  connectionRef:
+    name: openbao
+  creationPolicy: Adopt
+  deletionPolicy: Delete
+EOF
+wait_ready openbaoentity/e2e-conflict-alias-target
+
+conflict_alias_id="$(openbao_cli write -format=json identity/entity-alias name=e2e-conflict-login mount_accessor="${auth_accessor}" canonical_id="${conflict_alias_target_id}" | jq -er '.data.id')"
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntityAlias
+metadata:
+  name: e2e-conflict-alias
+spec:
+  connectionRef:
+    name: openbao
+  entityRef:
+    name: e2e-conflict-alias-target
+  mountAccessor: ${auth_accessor}
+  name: e2e-conflict-login
+EOF
+wait_for_condition_reason openbaoentityalias/e2e-conflict-alias AliasAcquireFailed
+kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentityalias/e2e-conflict-alias -o json \
+  | jq -e '.status.conditions[] | select(.type == "Ready") | select(.message | contains("already exists"))' >/dev/null
+
+openbao_cli write identity/entity name=e2e-orphan-alias-target policies=default >/dev/null
+orphan_alias_target_id="$(openbao_cli read -format=json identity/entity/name/e2e-orphan-alias-target | jq -er '.data.id')"
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntity
+metadata:
+  name: e2e-orphan-alias-target
+spec:
+  connectionRef:
+    name: openbao
+  creationPolicy: Adopt
+  deletionPolicy: Delete
+EOF
+wait_ready openbaoentity/e2e-orphan-alias-target
+
+orphan_alias_id="$(openbao_cli write -format=json identity/entity-alias name=e2e-orphan-login mount_accessor="${auth_accessor}" canonical_id="${orphan_alias_target_id}" | jq -er '.data.id')"
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntityAlias
+metadata:
+  name: e2e-orphan-alias
+spec:
+  connectionRef:
+    name: openbao
+  entityRef:
+    name: e2e-orphan-alias-target
+  mountAccessor: ${auth_accessor}
+  name: e2e-orphan-login
+  creationPolicy: Adopt
+  deletionPolicy: Orphan
+EOF
+wait_ready openbaoentityalias/e2e-orphan-alias
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentityalias/e2e-orphan-alias --wait=true >/dev/null
+assert_remote_alias "${orphan_alias_id}" e2e-orphan-login "${auth_accessor}" "${orphan_alias_target_id}"
+openbao_cli delete "identity/entity-alias/id/${orphan_alias_id}" >/dev/null
+
 openbao_cli write identity/entity name=e2e-conflict metadata=owner=external policies=default >/dev/null
 cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1
@@ -220,10 +374,22 @@ kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity/e2e-orphan --wait=true >
 assert_remote_entity "${orphan_id}" e2e-orphan ""
 openbao_cli delete "identity/entity/id/${orphan_id}" >/dev/null
 
-kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity e2e-created e2e-adopt --wait=false >/dev/null
-kubectl_cmd -n "${TEST_NAMESPACE}" wait --for=delete openbaoentity/e2e-created openbaoentity/e2e-adopt --timeout=5m >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentityalias e2e-alias e2e-adopt-alias --wait=false >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" wait --for=delete openbaoentityalias/e2e-alias openbaoentityalias/e2e-adopt-alias --timeout=5m >/dev/null
+assert_remote_alias_absent "${alias_id}"
+assert_remote_alias_absent "${adopt_alias_id}"
+
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentityalias/e2e-conflict-alias --wait=true >/dev/null
+openbao_cli delete "identity/entity-alias/id/${conflict_alias_id}" >/dev/null
+
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity e2e-created e2e-adopt e2e-conflict-alias-target e2e-orphan-alias-target --wait=false >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" wait --for=delete \
+  openbaoentity/e2e-created openbaoentity/e2e-adopt \
+  openbaoentity/e2e-conflict-alias-target openbaoentity/e2e-orphan-alias-target --timeout=5m >/dev/null
 assert_remote_absent "${created_id}"
 assert_remote_absent "${adopt_id}"
+assert_remote_absent "${conflict_alias_target_id}"
+assert_remote_absent "${orphan_alias_target_id}"
 
 kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity/e2e-conflict --wait=true >/dev/null
 openbao_cli delete identity/entity/name/e2e-conflict >/dev/null

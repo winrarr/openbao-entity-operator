@@ -39,6 +39,7 @@ const (
 	testEntityName         = "payments"
 	testOwner              = "platform"
 	testMetadataKey        = "team"
+	testConnectionName     = "openbao"
 	testDefaultPolicy      = "default"
 	testReacquiredEntityID = "entity-2"
 )
@@ -162,7 +163,7 @@ func TestEntityReconcilerPersistsReacquiredID(t *testing.T) {
 
 func TestConnectionReconcilerRecordsHealthAndAuthentication(t *testing.T) {
 	connection := &openbaov1alpha1.OpenBaoConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: "openbao", Namespace: testNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
 		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
 			Address:        "https://openbao.example.test",
 			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: "token"},
@@ -190,7 +191,7 @@ func TestConnectionReconcilerRecordsHealthAndAuthentication(t *testing.T) {
 
 func readyConnection() *openbaov1alpha1.OpenBaoConnection {
 	return &openbaov1alpha1.OpenBaoConnection{
-		ObjectMeta: metav1.ObjectMeta{Name: "openbao", Namespace: testNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
 		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
 			Address:        "https://openbao.example.test",
 			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: "token"},
@@ -215,6 +216,8 @@ func newTestClient(objects ...client.Object) client.Client {
 			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoConnection"}
 		case *openbaov1alpha1.OpenBaoEntity:
 			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoEntity"}
+		case *openbaov1alpha1.OpenBaoEntityAlias:
+			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoEntityAlias"}
 		}
 	}
 	runtimeObjects := make([]runtime.Object, 0, len(objects))
@@ -222,7 +225,7 @@ func newTestClient(objects ...client.Object) client.Client {
 		runtimeObjects = append(runtimeObjects, object)
 	}
 	result := fake.NewClientBuilder().WithScheme(scheme).
-		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}).
+		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}).
 		WithRuntimeObjects(runtimeObjects...).Build()
 	return result
 }

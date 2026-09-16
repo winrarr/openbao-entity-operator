@@ -1,0 +1,11 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntityAlias
+metadata:
+  name: openbaoentityalias-sample
+spec:
+  connectionRef:
+    name: openbaoconnection-sample
+  entityRef:
+    name: openbaoentity-sample
+  mountAccessor: auth_token_example
+  name: platform-user

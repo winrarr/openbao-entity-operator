@@ -165,6 +165,14 @@ func resolveConnection(ctx context.Context, kubeClient client.Client, namespace 
 	return &connection, nil
 }
 
+func resolveEntity(ctx context.Context, kubeClient client.Client, namespace string, ref openbaov1alpha1.OpenBaoEntityReference) (*openbaov1alpha1.OpenBaoEntity, error) {
+	var entity openbaov1alpha1.OpenBaoEntity
+	if err := kubeClient.Get(ctx, types.NamespacedName{Namespace: namespace, Name: ref.Name}, &entity); err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+
 func ensureFinalizer(ctx context.Context, kubeClient client.Client, obj client.Object) error {
 	if controllerutil.ContainsFinalizer(obj, finalizerName) {
 		return nil

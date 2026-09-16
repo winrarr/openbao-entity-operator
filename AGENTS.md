@@ -6,6 +6,7 @@ This is a Go 1.27 Kubernetes operator for OpenBao identity entities. The public 
 
 - `OpenBaoConnection` validates an OpenBao address and token Secret, then records health and authentication status.
 - `OpenBaoEntity` creates, adopts, updates, observes, and optionally deletes one OpenBao identity entity. The Kubernetes object name is the OpenBao entity name.
+- `OpenBaoEntityAlias` binds an auth-method mount accessor and alias name to a referenced entity, with explicit adoption and deletion policies.
 - `internal/controller/openbao` contains reconciliation and dependency handling.
 - `internal/openbaoclient` contains the intentionally small typed HTTP client.
 - `config/` contains Kustomize installation and generated CRD/RBAC output.
@@ -18,7 +19,7 @@ This is a Go 1.27 Kubernetes operator for OpenBao identity entities. The public 
 - Do not edit `api/**/zz_generated.deepcopy.go`, `config/crd/bases/`, or `config/rbac/role.yaml`; regenerate them with `make manifests generate`.
 - `PROJECT` is Kubebuilder metadata. Change it only when the project layout or API inventory changes.
 - OpenBao credentials belong only in same-namespace Kubernetes Secrets. Never put tokens in status, logs, samples, fixtures, or documentation.
-- Connection references are same-namespace and immutable for an `OpenBaoEntity`; changing the target requires deleting and recreating the resource.
+- Connection and external identity references are same-namespace and immutable for `OpenBaoEntity` and `OpenBaoEntityAlias`; changing the target requires deleting and recreating the resource.
 - `OpenBaoEntity` defaults to `creationPolicy: Create` and `deletionPolicy: Orphan`. External deletion is always opt-in.
 - Preserve unrelated work in a dirty worktree. Generated files are derived output and should be reviewed for drift, not hand-edited.
 

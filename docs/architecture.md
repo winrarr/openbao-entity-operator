@@ -7,7 +7,8 @@ Kubernetes API
     │
     ├── OpenBaoConnectionReconciler ──┐
     │                                 │
-    └── OpenBaoEntityReconciler ──────┼── internal/openbaoclient ── OpenBao HTTP API
+    ├── OpenBaoEntityReconciler ──────┤
+    └── OpenBaoEntityAliasReconciler ─┼── internal/openbaoclient ── OpenBao HTTP API
                                       │
                               same-namespace Secret
 ```
@@ -24,8 +25,10 @@ The controller watches referenced Secrets. Changes to a Secret enqueue only conn
 
 `OpenBaoEntityReconciler` resolves a ready connection before making external calls. It uses the recorded status ID as the stable binding after creation or adoption. If no ID exists, it looks up the entity by name and applies the creation policy. Once bound, it reads by ID, refuses an unexpected name mismatch, updates only when the desired state differs, and records the observed state in status.
 
+`OpenBaoEntityAliasReconciler` resolves both the connection and a ready `OpenBaoEntity`, then binds the alias to the entity's current stable ID. OpenBao has no direct alias lookup by name and mount accessor, so initial adoption scans the alias ID list and reads candidates before applying the explicit creation policy. Once bound, the alias ID remains stable; external canonical-entity drift is corrected and changes to the referenced entity ID are propagated.
+
 Deletion is safe by default: `Orphan` removes the Kubernetes finalizer without calling OpenBao. `Delete` adds a finalizer before external mutation and removes it only after the OpenBao entity is deleted or already absent.
 
 ## Extension boundary
 
-The typed client interfaces used by the reconcilers are intentionally narrow and injectable in tests. Future controllers can add OpenBao-native surfaces without turning the first controller into a generic arbitrary-path reconciler. Aliases and groups should bind to explicit entity or connection references and must preserve stable external IDs before they are added.
+The typed client interfaces used by the reconcilers are intentionally narrow and injectable in tests. Future controllers can add OpenBao-native surfaces without turning the controller into a generic arbitrary-path reconciler. Groups should bind to explicit entity or connection references and must preserve stable external IDs before they are added.

@@ -126,6 +126,10 @@ func (c *Client) do(ctx context.Context, method, path string, body, target any, 
 }
 
 func (c *Client) doSegments(ctx context.Context, method string, segments []string, body, target any, allowedStatuses ...int) error {
+	return c.doSegmentsQuery(ctx, method, segments, nil, body, target, allowedStatuses...)
+}
+
+func (c *Client) doSegmentsQuery(ctx context.Context, method string, segments []string, query url.Values, body, target any, allowedStatuses ...int) error {
 	requestURL := *c.baseURL
 	requestURL.Path = strings.TrimRight(c.baseURL.Path, "/") + "/v1"
 	requestURL.RawPath = strings.TrimRight(c.baseURL.EscapedPath(), "/") + "/v1"
@@ -133,6 +137,7 @@ func (c *Client) doSegments(ctx context.Context, method string, segments []strin
 		requestURL.Path += "/" + segment
 		requestURL.RawPath += "/" + url.PathEscape(segment)
 	}
+	requestURL.RawQuery = query.Encode()
 
 	var requestBody io.Reader
 	if body != nil {

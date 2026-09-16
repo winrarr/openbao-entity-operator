@@ -267,17 +267,14 @@ kind-install-openbao: kind-install-cni kind-load-openbao-image ## Install the di
 
 .PHONY: kind-load-image
 kind-load-image: kind-create docker-build ## Load the operator image into Kind.
-	@if "$(CONTAINER_TOOL)" exec "$(KIND_CLUSTER)-control-plane" ctr --namespace=k8s.io images inspect "$(IMG)" >/dev/null 2>&1; then \
-		echo "Operator image $(IMG) is already present on the Kind node"; \
-	else \
-		"$(KIND)" load docker-image "$(IMG)" --name "$(KIND_CLUSTER)"; \
-	fi
+	"$(KIND)" load docker-image "$(IMG)" --name "$(KIND_CLUSTER)"
 
 .PHONY: kind-deploy
 kind-deploy: ## Build and deploy the operator into Kind.
 	$(MAKE) kind-up
 	$(MAKE) kind-load-image
 	$(MAKE) KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" install deploy
+	$(MAKE) kind-restart
 
 .PHONY: kind-deploy-e2e
 kind-deploy-e2e: kind-deploy ## Build and deploy the operator for live E2E tests.

@@ -11,6 +11,7 @@ Package v1alpha1 contains API Schema definitions for the openbao v1alpha1 API gr
 ### Resource Types
 - [OpenBaoConnection](#openbaoconnection)
 - [OpenBaoEntity](#openbaoentity)
+- [OpenBaoEntityAlias](#openbaoentityalias)
 
 
 
@@ -23,6 +24,7 @@ CreationPolicy controls how an external entity is acquired.
 
 
 _Appears in:_
+- [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 
 | Field | Description |
@@ -41,6 +43,7 @@ DeletionPolicy controls what happens to an external entity on deletion.
 
 
 _Appears in:_
+- [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 
 | Field | Description |
@@ -76,6 +79,7 @@ OpenBaoConnectionReference identifies a same-namespace OpenBaoConnection.
 
 
 _Appears in:_
+- [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 
 | Field | Description | Default | Validation |
@@ -118,6 +122,62 @@ OpenBaoEntity is the Schema for the openbaoentities API.
 | `kind` _string_ | `OpenBaoEntity` | | |
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  | Optional: \{\} <br /> |
 | `spec` _[OpenBaoEntitySpec](#openbaoentityspec)_ | spec defines the desired state of OpenBaoEntity |  | Required: \{\} <br /> |
+
+
+#### OpenBaoEntityAlias
+
+
+
+OpenBaoEntityAlias is the Schema for the openbaoentityaliases API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `openbao.openbao-operator.io/v1alpha1` | | |
+| `kind` _string_ | `OpenBaoEntityAlias` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  | Optional: \{\} <br /> |
+| `spec` _[OpenBaoEntityAliasSpec](#openbaoentityaliasspec)_ | spec defines the desired state of OpenBaoEntityAlias |  | Required: \{\} <br /> |
+
+
+#### OpenBaoEntityAliasSpec
+
+
+
+OpenBaoEntityAliasSpec defines the desired state of an OpenBao entity alias.
+
+
+
+_Appears in:_
+- [OpenBaoEntityAlias](#openbaoentityalias)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `connectionRef` _[OpenBaoConnectionReference](#openbaoconnectionreference)_ | ConnectionRef selects the OpenBao API connection in the same namespace. |  |  |
+| `entityRef` _[OpenBaoEntityReference](#openbaoentityreference)_ | EntityRef selects the OpenBaoEntity receiving this alias in the same namespace. |  |  |
+| `mountAccessor` _string_ | MountAccessor is the OpenBao auth-method mount accessor for this alias. |  | MinLength: 1 <br /> |
+| `name` _string_ | Name is the name presented by the auth method for this alias. |  | MinLength: 1 <br /> |
+| `creationPolicy` _[CreationPolicy](#creationpolicy)_ | CreationPolicy controls how an external alias is acquired. | Create | Enum: [Create Adopt CreateOrAdopt] <br />Optional: \{\} <br /> |
+| `deletionPolicy` _[DeletionPolicy](#deletionpolicy)_ | DeletionPolicy controls whether the external alias is deleted with this resource. | Orphan | Enum: [Delete Orphan] <br />Optional: \{\} <br /> |
+| `driftDetectionInterval` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | DriftDetectionInterval controls periodic checks for changes made outside Kubernetes.<br />A zero duration disables periodic checks. When omitted, the operator default is used. |  | Optional: \{\} <br /> |
+
+
+#### OpenBaoEntityReference
+
+
+
+OpenBaoEntityReference identifies a same-namespace OpenBaoEntity.
+
+
+
+_Appears in:_
+- [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ | Name is the OpenBaoEntity resource name. |  | MinLength: 1 <br /> |
 
 
 #### OpenBaoEntitySpec

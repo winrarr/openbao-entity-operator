@@ -8,7 +8,7 @@ The first vertical slice gives platform teams a declarative boundary around one 
 Kubernetes Secret → OpenBaoConnection → OpenBaoEntity
 ```
 
-The operator validates connectivity, reconciles entity metadata, policies, and disabled state, reports the external entity ID in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
+The operator validates connectivity, reconciles entity metadata, policies, and disabled state, binds auth-method aliases to entities, reports stable external IDs in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
 
 ## Quick start
 
@@ -49,6 +49,8 @@ spec:
 ```
 
 The entity's Kubernetes `metadata.name` is its OpenBao name. Use `creationPolicy: Adopt` or `CreateOrAdopt` when an entity already exists and should be managed instead of treated as a conflict. `deletionPolicy: Delete` is opt-in and permanently removes the recorded OpenBao entity.
+
+An `OpenBaoEntityAlias` references the entity resource, an OpenBao auth-method mount accessor, and the alias name presented by that auth method. Its `status.canonicalID` records the bound entity ID; aliases default to safe orphaning and can opt into external deletion.
 
 ## Install from a checkout
 

@@ -18,6 +18,7 @@ The target:
 - installs the generated CRDs and operator manifests;
 - verifies connection health and token authentication;
 - verifies entity creation, status ID persistence, metadata/policy/disabled-state updates, external deletion recovery, adoption, conflict protection, orphaning, and opt-in deletion;
+- verifies alias creation, canonical-entity drift correction, adoption, conflict protection, orphaning, and opt-in deletion;
 - removes the test namespace after a successful run.
 
 The default CNI is the recommended first run because the scenarios test reconciliation and API behavior. It does not prove NetworkPolicy enforcement. To use Cilium, create the cluster with:

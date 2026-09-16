@@ -2,7 +2,7 @@
 
 ## Context
 
-The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The first slice is intentionally limited to one connection and entity lifecycle. Future identity capabilities influence the model but are not implemented now.
+The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers one connection, entity lifecycle, and entity-alias binding. Future identity capabilities influence the model but are not implemented now.
 
 ## Current stories
 
@@ -61,7 +61,15 @@ Design criteria: condition reason stability, retry intervals, dependency watches
 
 As a platform operator, I want to bind an OpenBao auth-method alias to an entity, so that authenticated workloads resolve to the declaratively managed identity.
 
-Reason to preserve: aliases are the normal bridge between auth methods and identity entities, and the OpenBao API exposes explicit alias IDs. The current model must keep entity IDs stable and allow alias resources to reference entities without embedding auth-method-specific fields in `OpenBaoEntity`.
+Acceptance criteria:
+
+- Given a ready connection and entity, when an `OpenBaoEntityAlias` is reconciled with `creationPolicy=Create`, then OpenBao contains the declared alias and the returned alias ID and canonical entity ID are stored in status.
+- Given a matching alias already exists, when `creationPolicy=Create`, then reconciliation reports a conflict and does not silently adopt it.
+- Given a matching alias already exists, when `creationPolicy=Adopt` or `CreateOrAdopt`, then reconciliation records its ID and manages it.
+- Given an alias is bound by ID, when its canonical entity ID differs from the referenced entity's current ID, then reconciliation updates the alias to the referenced entity.
+- Given `deletionPolicy=Orphan`, when the Kubernetes resource is deleted, then the OpenBao alias remains; given `deletionPolicy=Delete`, then the alias is removed before the finalizer is released.
+
+Design criteria: same-namespace connection and entity references, immutable alias identity fields, stable alias IDs, alias-list lookup for initial adoption, explicit ownership policies, and watches for connection and entity changes.
 
 ### US-006 — Manage groups and membership
 
@@ -83,7 +91,7 @@ Reason to preserve: namespace context changes the effective API target and crede
 | US-002 | Current | Covered now | Covered now | Explicit create/adopt and stable ID are important in either design |
 | US-003 | Current | Covered now | Supported later | Generic layers tend to obscure deletion safety |
 | US-004 | Current | Covered now | Supported later | Status and dependency behavior belongs in controllers, not SDK calls |
-| US-005 | Future | Supported later | Covered now | Add a typed alias client/controller without changing entity identity |
+| US-005 | Current | Covered now | Covered now | Alias client/controller binds to entity status ID without changing entity identity |
 | US-006 | Future | Supported later | Covered now | Explicit group APIs remain possible; generic membership is not required |
 | US-007 | Future | Supported later | Supported later | Centralized client construction preserves the extension point |
 

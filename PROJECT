@@ -28,4 +28,13 @@ resources:
   kind: OpenBaoEntity
   path: github.com/rkthtrifork/openbao-entity-operator/api/openbao/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openbao-operator.io
+  group: openbao
+  kind: OpenBaoEntityAlias
+  path: github.com/rkthtrifork/openbao-entity-operator/api/openbao/v1alpha1
+  version: v1alpha1
 version: "3"
