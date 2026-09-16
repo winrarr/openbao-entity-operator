@@ -14,24 +14,22 @@ The target builds the operator image, installs the committed Helm chart, and the
 - uses Kind's default CNI unless `KIND_CNI=cilium` is supplied;
 - loads `openbao/openbao:2.6.2` and starts a single in-memory dev server;
 - generates a local-only root token into a Kubernetes Secret, without writing it to the checkout or printing it;
-- configures OpenBao Kubernetes Auth for the operator ServiceAccount and gives that role only the identity and token lifecycle permissions needed by the test;
+- configures OpenBao Kubernetes Auth for the operator ServiceAccount and gives that role only the identity, ACL policy, and token lifecycle permissions needed by the test;
 - builds and loads the operator image;
 - installs the generated CRDs and operator manifests;
-- verifies connection health and token authentication;
-- verifies ACL policy creation, exact document updates, external drift recovery, adoption, conflict protection, orphaning, and opt-in deletion;
-- verifies entity creation, status ID persistence, metadata/policy/disabled-state updates, external deletion recovery, adoption, conflict protection, orphaning, and opt-in deletion;
-- verifies alias creation, canonical-entity drift correction, adoption, conflict protection, orphaning, and opt-in deletion;
-- verifies group creation, entity and subgroup membership, preservation of an unmanaged remote member, membership-claim removal, and opt-in group deletion;
-- verifies Delete-policy cleanup when the connection or token Secret disappears first;
-- verifies namespace-targeted connections isolate entities in two OpenBao namespaces;
+- verifies CRD installation and the controller's generated RBAC surface;
+- configures OpenBao Kubernetes Auth and verifies a real projected ServiceAccount login;
+- verifies one successful ACL policy and entity graph, including policy status version/hash and entity ID persistence;
+- verifies one entity alias binding and one internal group membership against the live OpenBao API;
 - removes the test namespace after a successful run.
 
 Each run first removes only the workflow's fixed `e2e-*` OpenBao fixtures from the disposable OpenBao instance. Do not point this workflow at a shared OpenBao deployment.
 
 The root token is used only to bootstrap the disposable server and configure the
-test auth method. The main connection and identity lifecycle use Kubernetes Auth
-through the projected operator ServiceAccount JWT. Token-authenticated resources
-remain in the workflow for dependency-loss and cleanup scenarios.
+test auth method. The main connection and resource graph use Kubernetes Auth
+through the projected operator ServiceAccount JWT. Token-authenticated
+connection behavior is covered by HTTP and reconciliation tests rather than by
+duplicated live fixtures.
 
 The default CNI is the recommended first run because the scenarios test reconciliation and API behavior. It does not prove NetworkPolicy enforcement. To use Cilium, create the cluster with:
 
@@ -47,8 +45,8 @@ Failed runs preserve the test namespace so status and logs remain available:
 
 ```sh
 kubectl --context kind-openbao-entity-operator get pods -A
-kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaopolicies,openbaoentities,openbaogroups,openbaogroupmemberships -n openbao-entity-operator-e2e
-kubectl --context kind-openbao-entity-operator describe openbaoentity/e2e-created -n openbao-entity-operator-e2e
+kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaopolicies,openbaoentities,openbaoentityaliases,openbaogroups,openbaogroupmemberships -n openbao-entity-operator-e2e
+kubectl --context kind-openbao-entity-operator describe openbaoentity/e2e-entity -n openbao-entity-operator-e2e
 kubectl --context kind-openbao-entity-operator logs deployment/openbao-entity-operator -n openbao-entity-operator-system
 ```
 

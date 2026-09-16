@@ -20,11 +20,16 @@ Exit criteria: add an independently scoped manager deployment and verify its cac
 
 ## TD-003: OpenBao API compatibility is snapshot-based
 
-Status: open
+Status: accepted policy
 
-The checked-in OpenAPI document is a runtime snapshot from OpenBao v2.6.2. OpenBao may change endpoint behavior or the generated document across releases, and the first slice has no version matrix.
+The checked-in OpenAPI document is a runtime snapshot from the newest stable
+OpenBao release selected for the project line, currently v2.6.2. The project
+does not maintain a backwards-compatibility matrix or promise support for
+older releases and pre-release builds.
 
-Exit criteria: define the supported OpenBao version policy and run the live contract suite against every supported version before updating the snapshot or client behavior.
+Exit criteria: reconsider only if a concrete supported deployment requires an
+older release or if the latest-stable policy becomes impractical. See the
+[compatibility policy](compatibility.md).
 
 ## TD-004: Delete-policy cleanup can orphan external objects after dependency loss
 
