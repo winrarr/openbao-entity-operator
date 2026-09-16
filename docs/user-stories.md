@@ -86,13 +86,18 @@ Acceptance criteria:
 
 Design criteria: same-namespace immutable references, stable group IDs, explicit create/adopt and deletion policies, internal-group membership claims, deterministic owned-edge tracking, preservation of unclaimed remote memberships, and watches for all referenced resources.
 
-## Future stories
+### US-007 — Target isolated OpenBao namespaces
 
-### US-007 — Support OpenBao namespaces when needed
+As a platform operator, I want a connection to target an OpenBao namespace, so that one operator can manage isolated identity domains in an OpenBao deployment that uses namespaces.
 
-As a platform operator, I want a connection or resource to target an OpenBao namespace, so that one operator can manage isolated identity domains in an OpenBao deployment that uses namespaces.
+Acceptance criteria:
 
-Reason to preserve: namespace context changes the effective API target and credential boundary. The current connection/client boundary should keep request context centralized without adding namespace behavior before it is needed.
+- Given a connection with no namespace, when it reconciles, then all requests target OpenBao's root namespace as before.
+- Given a connection with a valid absolute or relative namespace path, when it reconciles, then namespaced token self-lookup succeeds and entity, alias, group, and membership requests use that namespace consistently; the connection is Ready without root-only health fields because OpenBao does not expose `sys/health` within a namespace.
+- Given a missing or invalid namespace target, when the connection reconciles, then the connection reports `Ready=False` and dependent resources remain blocked without making external identity mutations.
+- Given two connections target different OpenBao namespaces, when entities with the same desired shape are reconciled, then each entity is isolated to its selected namespace.
+
+Design criteria: namespace context belongs to the connection/client boundary, root compatibility, immutable namespace targeting, OpenBao naming validation, and live isolation coverage.
 
 ## Design alternatives and recommendation
 
@@ -104,7 +109,7 @@ Reason to preserve: namespace context changes the effective API target and crede
 | US-004 | Current | Covered now | Supported later | Status and dependency behavior belongs in controllers, not SDK calls |
 | US-005 | Current | Covered now | Covered now | Alias client/controller binds to entity status ID without changing entity identity |
 | US-006 | Current | Covered now | Covered now | Group membership is an explicit owned edge while the typed client models OpenBao's group-level update API |
-| US-007 | Future | Supported later | Supported later | Centralized client construction preserves the extension point |
+| US-007 | Current | Covered now | Supported later | The typed client applies one validated namespace header to every request |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.
 

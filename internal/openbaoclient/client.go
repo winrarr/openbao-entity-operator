@@ -33,6 +33,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 )
 
 const maxErrorBodySize = 1 << 20
@@ -42,6 +43,7 @@ type Client struct {
 	baseURL    *url.URL
 	httpClient *http.Client
 	token      string
+	namespace  string
 }
 
 // HTTPError represents a non-successful OpenBao response.
@@ -75,8 +77,17 @@ func IsUnauthorized(err error) bool {
 
 // New validates the OpenBao address and returns an authenticated client.
 func New(baseURL, token string, timeout time.Duration, caBundle []byte) (*Client, error) {
+	return NewWithNamespace(baseURL, token, timeout, caBundle, "")
+}
+
+// NewWithNamespace validates the OpenBao address and returns an authenticated
+// client that routes requests through the supplied namespace.
+func NewWithNamespace(baseURL, token string, timeout time.Duration, caBundle []byte, namespace string) (*Client, error) {
 	if strings.TrimSpace(token) == "" {
 		return nil, errors.New("OpenBao token is empty")
+	}
+	if err := validateNamespace(namespace); err != nil {
+		return nil, err
 	}
 
 	parsed, err := url.Parse(strings.TrimRight(strings.TrimSpace(baseURL), "/"))
@@ -117,8 +128,34 @@ func New(baseURL, token string, timeout time.Duration, caBundle []byte) (*Client
 			Timeout:   timeout,
 			Transport: transport,
 		},
-		token: token,
+		token:     token,
+		namespace: namespace,
 	}, nil
+}
+
+func validateNamespace(namespace string) error {
+	if namespace == "" {
+		return nil
+	}
+	if strings.TrimSpace(namespace) != namespace {
+		return errors.New("OpenBao namespace must not start or end with whitespace")
+	}
+	reserved := map[string]struct{}{
+		".": {}, "..": {}, "root": {}, "sys": {}, "audit": {},
+		"auth": {}, "cubbyhole": {}, "identity": {},
+	}
+	for segment := range strings.SplitSeq(namespace, "/") {
+		if segment == "" {
+			return errors.New("OpenBao namespace must not contain empty path segments")
+		}
+		if _, ok := reserved[segment]; ok {
+			return fmt.Errorf("OpenBao namespace segment %q is reserved", segment)
+		}
+		if strings.IndexFunc(segment, unicode.IsSpace) >= 0 {
+			return errors.New("OpenBao namespace must not contain whitespace")
+		}
+	}
+	return nil
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body, target any, allowedStatuses ...int) error {
@@ -155,6 +192,9 @@ func (c *Client) doSegmentsQuery(ctx context.Context, method string, segments []
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Vault-Token", c.token)
 	req.Header.Set("X-Vault-Request", "true")
+	if c.namespace != "" {
+		req.Header.Set("X-Vault-Namespace", c.namespace)
+	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}

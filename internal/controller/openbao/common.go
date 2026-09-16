@@ -155,7 +155,7 @@ func connectionClientFor(ctx context.Context, kubeClient client.Client, connecti
 	if connection.Spec.RequestTimeout != nil && connection.Spec.RequestTimeout.Duration > 0 {
 		timeout = connection.Spec.RequestTimeout.Duration
 	}
-	return openbaoclient.New(connection.Spec.Address, token, timeout, caBundle)
+	return openbaoclient.NewWithNamespace(connection.Spec.Address, token, timeout, caBundle, connection.Spec.Namespace)
 }
 
 func resolveConnection(ctx context.Context, kubeClient client.Client, namespace string, ref openbaov1alpha1.OpenBaoConnectionReference) (*openbaov1alpha1.OpenBaoConnection, error) {

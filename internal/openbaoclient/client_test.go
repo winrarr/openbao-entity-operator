@@ -46,6 +46,9 @@ func TestEntityClientUsesOpenBaoHeadersAndPaths(t *testing.T) {
 		if request.Header.Get("X-Vault-Request") != "true" {
 			t.Errorf("X-Vault-Request = %q, want true", request.Header.Get("X-Vault-Request"))
 		}
+		if request.Header.Get("X-Vault-Namespace") != "" {
+			t.Errorf("X-Vault-Namespace = %q, want empty for root namespace", request.Header.Get("X-Vault-Namespace"))
+		}
 		requests = append(requests, request.Method+" "+request.URL.Path)
 		switch request.URL.Path {
 		case "/v1/identity/entity/name/payments":
@@ -73,6 +76,35 @@ func TestEntityClientUsesOpenBaoHeadersAndPaths(t *testing.T) {
 	}
 	if got, want := requests, []string{"GET /v1/identity/entity/name/payments"}; fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("requests = %v, want %v", got, want)
+	}
+}
+
+func TestClientUsesNamespaceHeader(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if got, want := request.Header.Get("X-Vault-Namespace"), "platform/production"; got != want {
+			t.Fatalf("X-Vault-Namespace = %q, want %q", got, want)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(writer, `{"data":{"id":"entity-1","name":"payments"}}`)
+	}))
+	defer server.Close()
+
+	apiClient, err := NewWithNamespace(server.URL, "test-token", time.Second, nil, "platform/production")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := apiClient.GetEntityByName(context.Background(), "payments"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNewWithNamespaceRejectsInvalidNamespace(t *testing.T) {
+	for _, namespace := range []string{"/platform", "platform/", "platform//production", "platform production", "identity"} {
+		t.Run(namespace, func(t *testing.T) {
+			if _, err := NewWithNamespace("http://openbao.example.test", "test-token", time.Second, nil, namespace); err == nil {
+				t.Fatalf("NewWithNamespace(%q) returned nil error", namespace)
+			}
+		})
 	}
 }
 

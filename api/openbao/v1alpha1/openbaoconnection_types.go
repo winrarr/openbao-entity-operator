@@ -28,6 +28,14 @@ type OpenBaoConnectionSpec struct {
 	// +kubebuilder:validation:MinLength=1
 	Address string `json:"address"`
 
+	// Namespace is an optional absolute or relative OpenBao namespace path.
+	// An empty value targets the root namespace. The value is sent as the
+	// X-Vault-Namespace request header.
+	// +optional
+	// +kubebuilder:validation:Pattern=`^$|^[^/[:space:]]+([/][^/[:space:]]+)*$`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="namespace is immutable; delete and recreate the OpenBaoConnection"
+	Namespace string `json:"namespace,omitempty"`
+
 	// TokenSecretRef references a same-namespace Secret containing an OpenBao token.
 	TokenSecretRef SecretKeyReference `json:"tokenSecretRef"`
 
@@ -48,19 +56,23 @@ type OpenBaoConnectionStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Version is the OpenBao server version observed during the last health check.
+	// Version is the OpenBao server version observed during the last root-namespace health check.
+	// It is empty for namespace-scoped connections because OpenBao does not expose sys/health in a namespace.
 	// +optional
 	Version string `json:"version,omitempty"`
 
-	// Initialized reports whether OpenBao has been initialized.
+	// Initialized reports whether OpenBao has been initialized according to the last root-namespace health check.
+	// It is not populated for namespace-scoped connections.
 	// +optional
 	Initialized bool `json:"initialized,omitempty"`
 
-	// Sealed reports whether OpenBao was sealed during the last health check.
+	// Sealed reports whether OpenBao was sealed during the last root-namespace health check.
+	// It is not populated for namespace-scoped connections.
 	// +optional
 	Sealed bool `json:"sealed,omitempty"`
 
-	// Standby reports whether this server is a standby node.
+	// Standby reports whether this server is a standby node according to the last root-namespace health check.
+	// It is not populated for namespace-scoped connections.
 	// +optional
 	Standby bool `json:"standby,omitempty"`
 

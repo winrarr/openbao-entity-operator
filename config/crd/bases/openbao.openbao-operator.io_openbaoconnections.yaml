@@ -79,6 +79,16 @@ spec:
                 required:
                 - name
                 type: object
+              namespace:
+                description: |-
+                  Namespace is an optional absolute or relative OpenBao namespace path.
+                  An empty value targets the root namespace. The value is sent as the
+                  X-Vault-Namespace request header.
+                pattern: ^$|^[^/[:space:]]+([/][^/[:space:]]+)*$
+                type: string
+                x-kubernetes-validations:
+                - message: namespace is immutable; delete and recreate the OpenBaoConnection
+                  rule: self == oldSelf
               requestTimeout:
                 default: 30s
                 description: RequestTimeout bounds each request made to OpenBao.
@@ -171,7 +181,9 @@ spec:
                 - type
                 x-kubernetes-list-type: map
               initialized:
-                description: Initialized reports whether OpenBao has been initialized.
+                description: |-
+                  Initialized reports whether OpenBao has been initialized according to the last root-namespace health check.
+                  It is not populated for namespace-scoped connections.
                 type: boolean
               observedGeneration:
                 description: ObservedGeneration is the most recent generation reflected
@@ -179,15 +191,19 @@ spec:
                 format: int64
                 type: integer
               sealed:
-                description: Sealed reports whether OpenBao was sealed during the
-                  last health check.
+                description: |-
+                  Sealed reports whether OpenBao was sealed during the last root-namespace health check.
+                  It is not populated for namespace-scoped connections.
                 type: boolean
               standby:
-                description: Standby reports whether this server is a standby node.
+                description: |-
+                  Standby reports whether this server is a standby node according to the last root-namespace health check.
+                  It is not populated for namespace-scoped connections.
                 type: boolean
               version:
-                description: Version is the OpenBao server version observed during
-                  the last health check.
+                description: |-
+                  Version is the OpenBao server version observed during the last root-namespace health check.
+                  It is empty for namespace-scoped connections because OpenBao does not expose sys/health in a namespace.
                 type: string
             type: object
         required:

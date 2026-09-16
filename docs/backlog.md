@@ -2,21 +2,6 @@
 
 These are real outcomes that are intentionally not part of the first vertical slice.
 
-## OpenBao namespaces
-
-Goal: add OpenBao namespace targeting when the supported deployment model requires isolated identity domains and credential boundaries.
-
-Rationale: namespace context changes the effective API target and token scope, so it should be designed at the connection/client boundary rather than added ad hoc to individual resources.
-
-Constraints: preserve same-namespace Kubernetes references, keep namespace headers and URL handling inside the typed client, and do not claim namespace support until the live workflow covers it.
-
-Acceptance criteria:
-
-- A connection can target an OpenBao namespace without duplicating namespace request logic across controllers.
-- Health, authentication, entity, alias, group, and membership requests use the selected namespace consistently.
-- Missing or invalid namespace configuration is visible through connection and dependent-resource status.
-- A live test proves that two OpenBao namespaces remain isolated.
-
 ## Installation chart
 
 Goal: add a Helm chart when the supported installation surface needs chart values or release packaging beyond the generated Kustomize bundle.

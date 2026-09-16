@@ -73,24 +73,35 @@ func (r *OpenBaoConnectionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{RequeueAfter: dependencyRetry}, nil
 	}
 
-	health, err := apiClient.CheckHealth(ctx)
-	if err != nil {
-		return r.fail(ctx, &connection, "HealthCheckFailed", err)
+	if connection.Spec.Namespace == "" {
+		health, err := apiClient.CheckHealth(ctx)
+		if err != nil {
+			return r.fail(ctx, &connection, "HealthCheckFailed", err)
+		}
+		connection.Status.Version = health.Version
+		connection.Status.Initialized = health.Initialized
+		connection.Status.Sealed = health.Sealed
+		connection.Status.Standby = health.Standby
+	} else {
+		// OpenBao does not expose sys/health from within a namespace. The
+		// namespaced token self-lookup below verifies both reachability and
+		// authentication without losing the namespace boundary.
+		logger.Info("Skipping namespace-scoped OpenBao health check", "namespace", connection.Spec.Namespace)
 	}
-	connection.Status.Version = health.Version
-	connection.Status.Initialized = health.Initialized
-	connection.Status.Sealed = health.Sealed
-	connection.Status.Standby = health.Standby
 	if err := apiClient.LookupSelf(ctx); err != nil {
 		return r.fail(ctx, &connection, "AuthenticationFailed", err)
 	}
 
 	connection.Status.Authenticated = true
-	markReady(&connection.Status.Conditions, connection.Generation, "OpenBao is reachable and the configured token is valid")
+	readyMessage := "OpenBao is reachable and the configured token is valid"
+	if connection.Spec.Namespace != "" {
+		readyMessage = "The configured token is valid in the OpenBao namespace"
+	}
+	markReady(&connection.Status.Conditions, connection.Generation, readyMessage)
 	if err := updateStatusIfChanged(ctx, r.Client, &connection, before, &connection.Status); err != nil {
 		return ctrl.Result{}, err
 	}
-	logger.Info("Verified OpenBao connection", "address", connection.Spec.Address, "version", connection.Status.Version)
+	logger.Info("Verified OpenBao connection", "address", connection.Spec.Address, "namespace", connection.Spec.Namespace, "version", connection.Status.Version)
 	return ctrl.Result{RequeueAfter: defaultDriftCheck}, nil
 
 }

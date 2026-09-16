@@ -43,6 +43,9 @@ const (
 	testConnectionName     = "openbao"
 	testDefaultPolicy      = "default"
 	testReacquiredEntityID = "entity-2"
+	testOpenBaoAddress     = "https://openbao.example.test"
+	testTokenKey           = "token"
+	testOpenBaoVersion     = "2.6.2"
 )
 
 func TestEntityReconcilerCreatesAndPersistsIdentity(t *testing.T) {
@@ -231,15 +234,15 @@ func TestConnectionReconcilerRecordsHealthAndAuthentication(t *testing.T) {
 	connection := &openbaov1alpha1.OpenBaoConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
 		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
-			Address:        "https://openbao.example.test",
-			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: "token"},
+			Address:        testOpenBaoAddress,
+			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
 		},
 	}
 	kubeClient := newTestClient(connection)
 	reconciler := &OpenBaoConnectionReconciler{
 		Client: kubeClient,
 		NewClient: func(context.Context, *openbaov1alpha1.OpenBaoConnection) (ConnectionClient, error) {
-			return &fakeConnectionClient{health: &openbaoclient.Health{Version: "2.6.2", Initialized: true}}, nil
+			return &fakeConnectionClient{health: &openbaoclient.Health{Version: testOpenBaoVersion, Initialized: true}}, nil
 		},
 	}
 
@@ -250,8 +253,47 @@ func TestConnectionReconcilerRecordsHealthAndAuthentication(t *testing.T) {
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(connection), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Status.Version != "2.6.2" || !got.Status.Authenticated || !conditionTrue(got.Status.Conditions) {
+	if got.Status.Version != testOpenBaoVersion || !got.Status.Authenticated || !conditionTrue(got.Status.Conditions) {
 		t.Fatalf("status = %#v, want authenticated v2.6.2 and Ready=True", got.Status)
+	}
+}
+
+func TestConnectionReconcilerUsesNamespacedAuthenticationWhenHealthIsUnavailable(t *testing.T) {
+	connection := &openbaov1alpha1.OpenBaoConnection{
+		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
+		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
+			Address:        testOpenBaoAddress,
+			Namespace:      "platform/production",
+			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
+		},
+	}
+	kubeClient := newTestClient(connection)
+	baoClient := &fakeConnectionClient{health: &openbaoclient.Health{Version: testOpenBaoVersion, Initialized: true}}
+	reconciler := &OpenBaoConnectionReconciler{
+		Client: kubeClient,
+		NewClient: func(_ context.Context, got *openbaov1alpha1.OpenBaoConnection) (ConnectionClient, error) {
+			if got.Spec.Namespace != "platform/production" {
+				t.Fatalf("connection namespace = %q, want platform/production", got.Spec.Namespace)
+			}
+			return baoClient, nil
+		},
+	}
+
+	if _, err := reconciler.Reconcile(context.Background(), reconcile.Request{NamespacedName: types.NamespacedName{Name: connection.Name, Namespace: connection.Namespace}}); err != nil {
+		t.Fatal(err)
+	}
+	var got openbaov1alpha1.OpenBaoConnection
+	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(connection), &got); err != nil {
+		t.Fatal(err)
+	}
+	if baoClient.healthCalls != 0 {
+		t.Fatalf("health calls = %d, want 0 for a namespaced connection", baoClient.healthCalls)
+	}
+	if baoClient.lookupCalls != 1 {
+		t.Fatalf("lookup-self calls = %d, want 1", baoClient.lookupCalls)
+	}
+	if got.Status.Version != "" || !got.Status.Authenticated || !conditionTrue(got.Status.Conditions) {
+		t.Fatalf("status = %#v, want authenticated namespaced connection without root health fields", got.Status)
 	}
 }
 
@@ -259,8 +301,8 @@ func readyConnection() *openbaov1alpha1.OpenBaoConnection {
 	return &openbaov1alpha1.OpenBaoConnection{
 		ObjectMeta: metav1.ObjectMeta{Name: testConnectionName, Namespace: testNamespace},
 		Spec: openbaov1alpha1.OpenBaoConnectionSpec{
-			Address:        "https://openbao.example.test",
-			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: "token"},
+			Address:        testOpenBaoAddress,
+			TokenSecretRef: openbaov1alpha1.SecretKeyReference{Name: testTokenKey},
 		},
 		Status: openbaov1alpha1.OpenBaoConnectionStatus{Conditions: []metav1.Condition{{
 			Type: conditionReady, Status: metav1.ConditionTrue, Reason: "Reconciled",
@@ -315,14 +357,20 @@ func findCondition(conditions []metav1.Condition) *metav1.Condition {
 }
 
 type fakeConnectionClient struct {
-	health *openbaoclient.Health
+	health      *openbaoclient.Health
+	healthCalls int
+	lookupCalls int
 }
 
 func (f *fakeConnectionClient) CheckHealth(context.Context) (*openbaoclient.Health, error) {
+	f.healthCalls++
 	return f.health, nil
 }
 
-func (f *fakeConnectionClient) LookupSelf(context.Context) error { return nil }
+func (f *fakeConnectionClient) LookupSelf(context.Context) error {
+	f.lookupCalls++
+	return nil
+}
 
 type fakeEntityClient struct {
 	entity      *openbaoclient.Entity

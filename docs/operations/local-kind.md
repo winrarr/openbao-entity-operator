@@ -21,6 +21,7 @@ The target:
 - verifies alias creation, canonical-entity drift correction, adoption, conflict protection, orphaning, and opt-in deletion;
 - verifies group creation, entity and subgroup membership, preservation of an unmanaged remote member, membership-claim removal, and opt-in group deletion;
 - verifies Delete-policy cleanup when the connection or token Secret disappears first;
+- verifies namespace-targeted connections isolate entities in two OpenBao namespaces;
 - removes the test namespace after a successful run.
 
 Each run first removes only the workflow's fixed `e2e-*` OpenBao fixtures from the disposable OpenBao instance. Do not point this workflow at a shared OpenBao deployment.

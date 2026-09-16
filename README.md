@@ -50,6 +50,8 @@ spec:
 
 The entity's Kubernetes `metadata.name` is its OpenBao name. Use `creationPolicy: Adopt` or `CreateOrAdopt` when an entity already exists and should be managed instead of treated as a conflict. `deletionPolicy: Delete` is opt-in and permanently removes the recorded OpenBao entity.
 
+To target an isolated OpenBao namespace, add `namespace: platform/production` to the connection. The namespace is immutable; create a new connection when moving resources to another OpenBao namespace. Namespace-scoped connections validate the token in that namespace and leave root-only health fields unpopulated.
+
 An `OpenBaoEntityAlias` references the entity resource, an OpenBao auth-method mount accessor, and the alias name presented by that auth method. Its `status.canonicalID` records the bound entity ID; aliases default to safe orphaning and can opt into external deletion.
 
 An `OpenBaoGroup` uses its Kubernetes name as the OpenBao group name. Create an `OpenBaoGroupMembership` for each entity or subgroup that should be claimed by the group:

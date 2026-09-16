@@ -18,7 +18,7 @@ The API types and Kubebuilder markers under `api/openbao/v1alpha1` are authorita
 
 ## Connection flow
 
-`OpenBaoConnectionReconciler` reads the referenced Secret, constructs a client with the optional CA bundle, calls `/v1/sys/health`, and validates the token with `/v1/auth/token/lookup-self`. Health statuses such as sealed, standby, and uninitialized are decoded even when OpenBao reports them with non-2xx HTTP codes. Tokens are never copied into status or log fields.
+`OpenBaoConnectionReconciler` reads the referenced Secret, constructs a client with the optional CA bundle and OpenBao namespace, and validates the token with `/v1/auth/token/lookup-self`. Root connections also call `/v1/sys/health`; health statuses such as sealed, standby, and uninitialized are decoded even when OpenBao reports them with non-2xx HTTP codes. OpenBao restricts `/sys/health` in child namespaces, so namespace-scoped connections establish readiness through namespaced token self-lookup. Tokens are never copied into status or log fields.
 
 The controller watches referenced Secrets. Changes to a Secret enqueue only connections that reference it. Connections periodically recheck health and authentication so status can recover after OpenBao becomes available again.
 
@@ -38,4 +38,4 @@ Deletion is safe by default: `Orphan` removes the Kubernetes finalizer without c
 
 ## Extension boundary
 
-The typed client interfaces used by the reconcilers are intentionally narrow and injectable in tests. Future controllers can add OpenBao-native surfaces without turning the controller into a generic arbitrary-path reconciler. Namespace support should extend centralized client construction rather than duplicating request-context handling in each controller.
+The typed client interfaces used by the reconcilers are intentionally narrow and injectable in tests. Future controllers can add OpenBao-native surfaces without turning the controller into a generic arbitrary-path reconciler. Namespace context is applied during centralized client construction, so every controller using a connection receives the same validated request boundary.

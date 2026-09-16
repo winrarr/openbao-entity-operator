@@ -9,6 +9,8 @@ Primary sources:
 - [OpenBao v2.6.2 release](https://github.com/openbao/openbao/releases/tag/v2.6.2)
 - [Official OpenAPI generation script](https://github.com/openbao/openbao/blob/main/scripts/gen_openapi.sh)
 - [OpenBao HTTP API documentation](https://github.com/openbao/openbao/blob/main/website/content/api-docs/index.mdx)
+- [OpenBao namespaces](https://openbao.org/docs/concepts/namespaces/)
+- [OpenBao namespace API](https://openbao.org/docs/next/api/system/namespaces/)
 - [OpenBao identity entity API](https://openbao.org/docs/2.4.x/api/secret/identity/entity/)
 - [OpenBao identity concepts](https://openbao.org/docs/next/concepts/identity/)
 
@@ -22,6 +24,9 @@ Primary sources:
 - OpenBao models group membership as fields on the group rather than as an independent membership endpoint. Internal groups support direct entity and subgroup membership; external groups use an external alias to map membership managed outside the identity store.
 - The health endpoint can use non-2xx status codes for standby, sealed, or uninitialized states; the response body still carries health information.
 - OpenBao exposes OpenAPI through `/v1/sys/internal/specs/openapi`. The official script starts OpenBao, enables selected built-in plugins, and queries that endpoint with `generic_mount_paths`.
+- OpenBao namespaces provide isolated identity and policy domains, including entities and groups. Namespace-aware API requests can use the `X-Vault-Namespace` header with an absolute or relative hierarchical namespace path; the root namespace is the default when the header is omitted.
+- Namespace paths cannot end with `/`, contain spaces, or use reserved path segments such as `root`, `sys`, `auth`, `cubbyhole`, or `identity`.
+- In the verified OpenBao v2.6.2 Kind instance, `GET /v1/sys/health` with a namespace header returned HTTP 400 (`operation unavailable in namespaces`), while namespaced token self-lookup remained available. The connection controller therefore uses health checks for root connections and namespaced token self-lookup for namespace-scoped readiness.
 
 ## Generated reference
 
@@ -44,6 +49,7 @@ The resulting document is OpenAPI 3.0.2, contains 231 paths and includes the ide
 - The operator binds a group to the ID returned by OpenBao and treats each Kubernetes membership as an explicit owned edge. Because OpenBao updates membership at group scope, the controller tracks previously managed member IDs in group status and preserves unclaimed remote edges.
 - The OpenAPI snapshot is a semantic reference rather than a generator input because OpenBao generates it at runtime and it can vary with version and enabled mounts.
 - A small typed client is sufficient for the current entity and connection stories and keeps unrelated secret-engine APIs outside the initial dependency surface.
+- Namespace targeting belongs on `OpenBaoConnection` because it changes the API and credential context for every resource using that connection. The operator therefore validates and applies one header in the shared client rather than duplicating namespace handling across controllers.
 
 ## Unresolved questions
 

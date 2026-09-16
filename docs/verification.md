@@ -14,7 +14,7 @@
 | `make kustomize-build` | The default installation manifests render | Does not apply them to a cluster |
 | `make docs-build` | The generated CRD reference is current and the documentation site passes strict validation | Does not publish the site locally |
 | `make check` | Runs the complete local foundation suite | Does not start external services |
-| `make kind-e2e` | Runs live connection, entity, alias, group, and membership lifecycle, drift, adoption, conflict, orphan, delete, and missing-cleanup-dependency scenarios against OpenBao in Kind | Uses a single in-memory OpenBao dev server |
+| `make kind-e2e` | Runs live connection, entity, alias, group, and membership lifecycle, drift, adoption, conflict, orphan, delete, missing-cleanup-dependency, and namespace-isolation scenarios against OpenBao in Kind | Uses a single in-memory OpenBao dev server |
 | `make kind-e2e-clean` | Removes only the named live E2E test namespace after deleting resources in dependency order | Does not remove external OpenBao objects left by a failed cleanup |
 | `make kind-down` | Removes only the named disposable Kind cluster | Deletes local OpenBao data and test resources |
 

@@ -76,6 +76,13 @@ openbao_cli() {
     env BAO_ADDR=http://127.0.0.1:8200 bao "$@"
 }
 
+openbao_cli_namespace() {
+  local namespace="$1"
+  shift
+  kubectl_cmd -n "${OPENBAO_NAMESPACE}" exec "deployment/${OPENBAO_DEPLOYMENT}" -- \
+    env BAO_ADDR=http://127.0.0.1:8200 BAO_NAMESPACE="${namespace}" bao "$@"
+}
+
 reset_remote_test_objects() {
   local alias_id alias_name group_id group_name name
   local alias_ids group_ids
@@ -110,9 +117,34 @@ reset_remote_test_objects() {
   done
 }
 
+reset_remote_test_namespaces() {
+  local namespace deleted
+  for namespace in e2e-namespace-a e2e-namespace-b; do
+    openbao_cli namespace delete "${namespace}" >/dev/null 2>&1 || true
+    deleted=false
+    for _ in {1..30}; do
+      if ! openbao_cli namespace lookup "${namespace}" >/dev/null 2>&1; then
+        deleted=true
+        break
+      fi
+      sleep 1
+    done
+    if [[ "${deleted}" != true ]]; then
+      echo "OpenBao namespace ${namespace} did not finish deleting" >&2
+      return 1
+    fi
+  done
+}
+
 remote_entity() {
   local id="$1"
   openbao_cli read -format=json "identity/entity/id/${id}"
+}
+
+remote_entity_in_namespace() {
+  local namespace="$1"
+  local id="$2"
+  openbao_cli_namespace "${namespace}" read -format=json "identity/entity/id/${id}"
 }
 
 remote_alias() {
@@ -138,10 +170,28 @@ assert_remote_entity() {
 		'.data.id == $id and .data.name == $name and (.data.policies | index("default")) != null' >/dev/null
 }
 
+assert_remote_entity_in_namespace() {
+  local namespace="$1"
+  local id="$2"
+  local expected_name="$3"
+  remote_entity_in_namespace "${namespace}" "${id}" | jq -e \
+    --arg id "${id}" --arg name "${expected_name}" \
+    '.data.id == $id and .data.name == $name and (.data.policies | index("default")) != null' >/dev/null
+}
+
 assert_remote_absent() {
   local id="$1"
   if remote_entity "${id}" >/dev/null 2>&1; then
     echo "OpenBao entity ${id} still exists" >&2
+    return 1
+  fi
+}
+
+assert_remote_entity_absent_in_namespace() {
+  local namespace="$1"
+  local id="$2"
+  if remote_entity_in_namespace "${namespace}" "${id}" >/dev/null 2>&1; then
+    echo "OpenBao entity ${id} still exists in namespace ${namespace}" >&2
     return 1
   fi
 }
@@ -238,6 +288,7 @@ kubectl_cmd -n "${OPENBAO_NAMESPACE}" wait --for=condition=available \
 kubectl_cmd -n "${OPERATOR_NAMESPACE}" wait --for=condition=available \
   "deployment/${operator_deployment}" --timeout=5m >/dev/null
 reset_remote_test_objects
+reset_remote_test_namespaces
 
 kubectl_cmd create namespace "${TEST_NAMESPACE}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
 kubectl_cmd -n "${OPENBAO_NAMESPACE}" get secret "${OPENBAO_TOKEN_SECRET}" -o json \
@@ -643,5 +694,80 @@ kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity/e2e-missing-secret --wai
 assert_remote_entity "${missing_secret_id}" e2e-missing-secret ""
 openbao_cli delete "identity/entity/id/${missing_secret_id}" >/dev/null
 kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoconnection/e2e-missing-secret --wait=true >/dev/null
+
+for namespace in e2e-namespace-a e2e-namespace-b; do
+  openbao_cli namespace create "${namespace}" >/dev/null
+done
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: e2e-namespace-a
+spec:
+  address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
+  namespace: e2e-namespace-a
+  tokenSecretRef:
+    name: ${OPENBAO_TOKEN_SECRET}
+    key: ${OPENBAO_TOKEN_KEY}
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: e2e-namespace-b
+spec:
+  address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
+  namespace: e2e-namespace-b
+  tokenSecretRef:
+    name: ${OPENBAO_TOKEN_SECRET}
+    key: ${OPENBAO_TOKEN_KEY}
+EOF
+wait_ready openbaoconnection/e2e-namespace-a
+wait_ready openbaoconnection/e2e-namespace-b
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntity
+metadata:
+  name: e2e-namespace-a-entity
+spec:
+  connectionRef:
+    name: e2e-namespace-a
+  policies:
+    - default
+  deletionPolicy: Delete
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntity
+metadata:
+  name: e2e-namespace-b-entity
+spec:
+  connectionRef:
+    name: e2e-namespace-b
+  policies:
+    - default
+  deletionPolicy: Delete
+EOF
+wait_ready openbaoentity/e2e-namespace-a-entity
+wait_ready openbaoentity/e2e-namespace-b-entity
+namespace_a_entity_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentity/e2e-namespace-a-entity -o jsonpath='{.status.id}')"
+namespace_b_entity_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentity/e2e-namespace-b-entity -o jsonpath='{.status.id}')"
+[[ "${namespace_a_entity_id}" != "${namespace_b_entity_id}" ]] || {
+  echo "namespace entities unexpectedly share an ID" >&2
+  exit 1
+}
+assert_remote_entity_in_namespace e2e-namespace-a "${namespace_a_entity_id}" e2e-namespace-a-entity
+assert_remote_entity_in_namespace e2e-namespace-b "${namespace_b_entity_id}" e2e-namespace-b-entity
+if remote_entity_in_namespace e2e-namespace-b "${namespace_a_entity_id}" >/dev/null 2>&1; then
+  echo "namespace B can read namespace A's entity" >&2
+  exit 1
+fi
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity/e2e-namespace-a-entity openbaoentity/e2e-namespace-b-entity --wait=false >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" wait --for=delete \
+  openbaoentity/e2e-namespace-a-entity openbaoentity/e2e-namespace-b-entity --timeout=5m >/dev/null
+assert_remote_entity_absent_in_namespace e2e-namespace-a "${namespace_a_entity_id}"
+assert_remote_entity_absent_in_namespace e2e-namespace-b "${namespace_b_entity_id}"
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoconnection/e2e-namespace-a openbaoconnection/e2e-namespace-b --wait=true >/dev/null
+for namespace in e2e-namespace-a e2e-namespace-b; do
+  openbao_cli namespace delete "${namespace}" >/dev/null
+done
 
 echo "Kind/OpenBao integration scenarios passed"
