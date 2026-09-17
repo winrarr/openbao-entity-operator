@@ -42,6 +42,8 @@ make docs-build        # Generate the CRD reference and build the strict docs si
 make docs-serve        # Serve the docs site locally on localhost:8000
 make kind-e2e          # Run live OpenBao/Kubernetes scenarios in Kind
 make kind-e2e-clean    # Remove retained live E2E resources in dependency order
+make kind-e2e-resilience       # Test operator restart and token-rotation recovery over TLS
+make kind-e2e-resilience-clean # Remove retained operator resilience fixture resources
 make kind-down         # Delete only the named local Kind cluster
 make update-openbao-openapi OPENBAO_TOKEN=...  # Refresh from a running OpenBao instance
 ```

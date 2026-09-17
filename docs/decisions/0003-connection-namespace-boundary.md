@@ -18,4 +18,4 @@ The API validates path shape and the client rejects OpenBao-reserved or otherwis
 - All resources using one connection share its namespace context.
 - Empty namespace values remain compatible with non-namespaced OpenBao deployments.
 - Moving resources between namespaces requires a new connection and explicit resource recreation or adoption.
-- Namespace deletion and credential loss can still leave external resources unavailable for cleanup; existing deletion-policy behavior applies.
+- Namespace deletion and credential loss can leave external resources temporarily unavailable for cleanup; Delete-policy resources retain their finalizer and report `CleanupRequired=True` until access is restored.

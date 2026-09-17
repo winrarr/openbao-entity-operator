@@ -67,7 +67,7 @@ handling and namespace routing.
 
 OpenBao exposes membership as arrays on the group update API rather than as independent membership endpoints. The controller therefore reads the current group, removes only membership IDs previously tracked as operator-managed, adds current claims, and writes the resulting arrays. Remote members that were never claimed remain intact. Membership status records the parent and member IDs; deleting a membership claim removes only that edge and never deletes the group or entity.
 
-Deletion is safe by default: `Orphan` removes the Kubernetes finalizer without calling OpenBao. `Delete` adds a finalizer before external mutation and removes it only after the OpenBao object is deleted or already absent. If the connection or its credential Secret disappears first, the controller logs a warning and releases the finalizer so Kubernetes deletion cannot deadlock; the external object may remain and requires separate cleanup.
+Deletion is safe by default: `Orphan` removes the Kubernetes finalizer without calling OpenBao. `Delete` adds a finalizer before external mutation and removes it only after the OpenBao object is deleted or already absent. If the connection or its credential Secret disappears first, the controller retains the finalizer, records `CleanupRequired=True` and `Stalled=True`, and retries until the dependency is restored. This preserves recoverable external cleanup instead of silently orphaning the object; manual finalizer removal remains an administrative override.
 
 ## Extension boundary
 

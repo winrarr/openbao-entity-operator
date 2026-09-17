@@ -24,7 +24,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -214,7 +213,7 @@ func TestEntityAliasReconcilerDeletesAlias(t *testing.T) {
 	}
 }
 
-func TestEntityAliasReconcilerReleasesFinalizerWhenConnectionIsMissing(t *testing.T) {
+func TestEntityAliasReconcilerRetainsFinalizerWhenConnectionIsMissing(t *testing.T) {
 	alias := &openbaov1alpha1.OpenBaoEntityAlias{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       testAliasName,
@@ -237,15 +236,16 @@ func TestEntityAliasReconcilerReleasesFinalizerWhenConnectionIsMissing(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != (ctrl.Result{}) {
-		t.Fatalf("result = %#v, want empty result", result)
+	if result.RequeueAfter != dependencyRetry {
+		t.Fatalf("result = %#v, want retry after %s", result, dependencyRetry)
 	}
 	var got openbaov1alpha1.OpenBaoEntityAlias
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(alias), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Finalizers) != 0 {
-		t.Fatalf("finalizers = %v, want none", got.Finalizers)
+	assertCleanupRequired(t, got.Status.Conditions)
+	if len(got.Finalizers) != 1 || got.Finalizers[0] != finalizerName {
+		t.Fatalf("finalizers = %v, want %q retained", got.Finalizers, finalizerName)
 	}
 }
 

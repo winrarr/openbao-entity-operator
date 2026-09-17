@@ -2,13 +2,13 @@
 
 This register contains material limitations in the current implementation. Planned product outcomes belong in the [backlog](backlog.md); these entries describe known constraints or verification gaps.
 
-## TD-001: Local live coverage uses OpenBao dev mode
+## TD-001: Default live coverage uses OpenBao dev mode
 
-Status: accepted limitation
+Status: partially addressed; operator resilience covered
 
-The Kind workflow runs a single OpenBao 2.6.2 dev server with an in-memory data store and a generated local-only root token for bootstrap. It now also configures Kubernetes Auth and runs the operator with a non-root identity policy, but it does not prove persistence, HA/standby behavior, or production TLS configuration.
+The default Kind workflow runs a single OpenBao 2.6.2 dev server with an in-memory data store and a generated local-only root token for bootstrap. The opt-in resilience workflow adds a separately provisioned one-node persistent/TLS OpenBao fixture, a non-root operator token, a server Pod restart, and token revocation/rotation recovery. It deliberately treats storage, Raft, initialization, unseal, TLS, ACL semantics, HA/standby behavior, backups, and restore as fixture plumbing rather than product assertions.
 
-Exit criteria: add a separately provisioned integration environment that exercises a persistent, non-root authentication setup before making production deployment claims.
+Exit criteria: add a separately provisioned integration environment only if the project needs production claims about OpenBao deployment, HA, storage, backup, or restore behavior. The current resilience profile is sufficient for the operator's reconnect and credential-rotation claims.
 
 ## TD-002: The shared manager has cluster-wide Secret access
 
@@ -44,8 +44,13 @@ older release or if the latest-stable policy becomes impractical. See the
 
 ## TD-004: Delete-policy cleanup can orphan external objects after dependency loss
 
-Status: accepted limitation
+Status: complete
 
-If a Delete-policy entity, alias, group, or ACL policy loses its `OpenBaoConnection` or credential Secret before its Kubernetes deletion is reconciled, the operator logs the loss and releases the finalizer to prevent a stuck Kubernetes object. This preserves cluster recoverability but cannot prove that the external object was deleted.
+Delete-policy resources now retain their finalizer when the referenced
+`OpenBaoConnection`, credential Secret, or external deletion request is
+unavailable. They report `CleanupRequired=True` and retry until cleanup can be
+proven. Unit tests cover connection loss, credential loss, and recovery, and
+the Kind workflow covers the live credential-loss path.
 
-Exit criteria: introduce a recoverable connection and credential lifecycle that preserves cleanup access during dependent-resource deletion, then add live coverage proving external deletion remains possible after dependency ordering changes.
+The accepted recovery trade-off is that a resource can remain `Terminating`
+until the platform restores access. See [Decision 0008](decisions/0008-deletion-finalizer-retention.md).

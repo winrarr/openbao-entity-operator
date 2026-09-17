@@ -43,9 +43,9 @@ Acceptance criteria:
 - Given `deletionPolicy=Orphan`, when the Kubernetes resource is deleted, then the operator removes its finalizer without deleting the OpenBao entity.
 - Given `deletionPolicy=Delete`, when the Kubernetes resource is deleted, then the operator deletes the bound OpenBao entity before removing its finalizer.
 - Given OpenBao already reports the entity absent, when deletion is reconciled, then the finalizer is removed successfully.
-- Given the referenced connection or credential Secret is already absent, when a Delete-policy resource is deleted, then the operator logs the dependency loss and removes its finalizer without claiming that the external object was deleted.
+- Given the referenced connection or credential Secret is already absent, when a Delete-policy resource is deleted, then the operator retains its finalizer, reports `CleanupRequired=True` and `Stalled=True`, and retries until the dependency is restored.
 
-Design criteria: finalizer only for external deletion, idempotent not-found handling, dependency-loss escape hatch with an explicit warning, and no remote mutation before the delete policy is known.
+Design criteria: finalizer only for external deletion, idempotent not-found handling, recoverable dependency-loss handling with explicit status, and no remote mutation before the delete policy is known.
 
 ### US-004 — Surface dependencies and failures
 
@@ -126,7 +126,7 @@ Acceptance criteria:
 - Given an existing policy, when `creationPolicy=Create`, then reconciliation reports a conflict and does not overwrite the document; `Adopt` and `CreateOrAdopt` explicitly allow management.
 - Given a managed policy whose OpenBao document changes or is deleted externally, when drift detection runs, then the declared `spec.rules` document is restored.
 - Given `deletionPolicy=Orphan`, when the Kubernetes resource is deleted, then the OpenBao policy remains; given `deletionPolicy=Delete`, then the policy is removed before the finalizer is released.
-- Given the referenced connection or credential Secret is already absent during Delete-policy cleanup, then the controller releases the finalizer with an explicit dependency-loss warning rather than leaving Kubernetes deletion stuck.
+- Given the referenced connection or credential Secret is already absent during Delete-policy cleanup, then the controller retains the finalizer, reports `CleanupRequired=True`, and resumes external deletion after the dependency is restored.
 
 Design criteria: same-namespace immutable connection reference, Kubernetes resource name as the stable OpenBao policy name, exact raw HCL or JSON document comparison, status hash/version instead of duplicating the full policy, explicit create/adopt and deletion policy, typed ACL endpoints only, and live Kubernetes Auth coverage.
 

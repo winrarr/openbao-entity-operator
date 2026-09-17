@@ -7,6 +7,13 @@ OpenBao state is available.
 - `Ready=True` means the latest desired state was applied successfully.
 - `Ready=False` means reconciliation needs attention; inspect `reason` and
   `message`.
+- `CleanupRequired=True` means a Delete-policy resource is waiting for the
+  connection, credentials, or OpenBao API access needed to remove its external
+  object. The resource intentionally remains `Terminating` until cleanup can
+  be proven.
+- `Stalled=True` means reconciliation is blocked. During deletion, inspect
+  `CleanupRequired` and restore the named dependency before considering any
+  manual finalizer action.
 - `observedGeneration` identifies the resource generation reflected in status.
   If it lags behind `metadata.generation`, reconciliation has not caught up.
 
