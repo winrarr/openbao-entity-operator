@@ -71,5 +71,5 @@ finalizer and leave the external object for explicit administrative cleanup.
 ## Local Kind failures
 
 Use the [local Kind guide](../operations/local-kind.md) to inspect the retained
-E2E namespace and run `make kind-e2e-clean`. Use `make kind-down` only to remove
-the named disposable cluster.
+E2E namespaces and run `make kind-e2e-clean`. Use `make kind-down` only to
+remove the named disposable cluster.

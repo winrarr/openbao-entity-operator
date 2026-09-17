@@ -17,6 +17,7 @@ KIND ?= $(shell command -v kind 2>/dev/null || echo $(LOCALBIN)/kind)
 HELM ?= helm
 HELM_ARGS ?=
 HELM_CMD = $(HELM) $(HELM_ARGS)
+HELM_INSTALL_ARGS ?=
 PROJECT_NAME ?= openbao-entity-operator
 CHART_DIR ?= charts/openbao-entity-operator
 CHART_PACKAGE_DIR ?= dist
@@ -29,6 +30,7 @@ OPENBAO_TOKEN_SECRET ?= openbao-dev-token
 OPENBAO_TOKEN_KEY ?= token
 OPERATOR_NAMESPACE ?= openbao-entity-operator-system
 E2E_TEST_NAMESPACE ?= openbao-entity-operator-e2e
+E2E_OUTSIDE_NAMESPACE ?= openbao-entity-operator-outside
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
@@ -208,6 +210,7 @@ helm-install: helm-lint ## Install or upgrade the operator Helm chart.
 		$(HELM_CMD) upgrade --install "$(PROJECT_NAME)" "$(CHART_DIR)" \
 			--namespace "$(OPERATOR_NAMESPACE)" --create-namespace \
 			--set-string "image.repository=$$IMG_REPO" --set-string "image.digest=$$IMG_DIGEST" --set-string image.tag="" \
+			$(HELM_INSTALL_ARGS) \
 			--wait --timeout 5m; \
 	else \
 		IMG_LAST="$${IMG_REF##*/}"; \
@@ -221,6 +224,7 @@ helm-install: helm-lint ## Install or upgrade the operator Helm chart.
 		$(HELM_CMD) upgrade --install "$(PROJECT_NAME)" "$(CHART_DIR)" \
 			--namespace "$(OPERATOR_NAMESPACE)" --create-namespace \
 			--set-string "image.repository=$$IMG_REPO" --set-string "image.tag=$$IMG_TAG" \
+			$(HELM_INSTALL_ARGS) \
 			--wait --timeout 5m; \
 	fi
 
@@ -328,18 +332,21 @@ kind-deploy: ## Build and deploy the operator into Kind.
 
 .PHONY: kind-deploy-e2e
 kind-deploy-e2e: kind-deploy ## Build and deploy the operator for live E2E tests.
+	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" create namespace "$(E2E_TEST_NAMESPACE)" --dry-run=client -o yaml | $(KUBECTL) --context="kind-$(KIND_CLUSTER)" apply -f -
+	$(MAKE) HELM_INSTALL_ARGS="--set-string watchNamespaces[0]=$(E2E_TEST_NAMESPACE)" KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" helm-install
 
 .PHONY: kind-e2e
 kind-e2e: ## Run the live OpenBao reconciliation workflow in Kind.
 	$(MAKE) kind-deploy-e2e
-	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
+	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" OUTSIDE_NAMESPACE="$(E2E_OUTSIDE_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
 		OPENBAO_TOKEN_SECRET="$(OPENBAO_TOKEN_SECRET)" OPENBAO_TOKEN_KEY="$(OPENBAO_TOKEN_KEY)" OPERATOR_NAMESPACE="$(OPERATOR_NAMESPACE)" \
 		OPERATOR_DEPLOYMENT="$(PROJECT_NAME)" \
 		./hack/e2e-kind.sh
+	$(MAKE) HELM_INSTALL_ARGS="" KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" helm-install
 
 .PHONY: kind-e2e-clean
 kind-e2e-clean: kind ## Remove only the failed live E2E test resources.
-	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" ./hack/cleanup-kind-e2e.sh
+	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" OUTSIDE_NAMESPACE="$(E2E_OUTSIDE_NAMESPACE)" ./hack/cleanup-kind-e2e.sh
 
 .PHONY: kind-refresh
 kind-refresh: ## Rebuild and redeploy the operator in Kind.

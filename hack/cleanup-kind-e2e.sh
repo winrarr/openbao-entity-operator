@@ -4,6 +4,7 @@ set -euo pipefail
 KUBECTL=${KUBECTL:-kubectl}
 KUBE_CONTEXT=${KUBE_CONTEXT:-kind-openbao-entity-operator}
 TEST_NAMESPACE=${TEST_NAMESPACE:-openbao-entity-operator-e2e}
+OUTSIDE_NAMESPACE=${OUTSIDE_NAMESPACE:-openbao-entity-operator-outside}
 DELETE_TIMEOUT=${DELETE_TIMEOUT:-5m}
 
 kubectl_cmd() {
@@ -23,3 +24,12 @@ done
 
 echo "Deleting namespace ${TEST_NAMESPACE}"
 kubectl_cmd delete namespace "${TEST_NAMESPACE}" --ignore-not-found=true --wait=true --timeout="${DELETE_TIMEOUT}" >/dev/null
+
+if kubectl_cmd get namespace "${OUTSIDE_NAMESPACE}" >/dev/null 2>&1; then
+	if [[ "${OUTSIDE_NAMESPACE}" == "${TEST_NAMESPACE}" ]]; then
+		echo "OUTSIDE_NAMESPACE must differ from TEST_NAMESPACE" >&2
+		exit 1
+	fi
+	echo "Deleting namespace ${OUTSIDE_NAMESPACE}"
+	kubectl_cmd delete namespace "${OUTSIDE_NAMESPACE}" --ignore-not-found=true --wait=true --timeout="${DELETE_TIMEOUT}" >/dev/null
+fi

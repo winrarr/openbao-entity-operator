@@ -1,0 +1,52 @@
+# Decision 0007: Enforce tenant boundaries at the Kubernetes and OpenBao layers
+
+Status: accepted
+
+## Context
+
+OpenBao provides native multi-tenancy through namespaces and default-deny ACL
+policies. Those controls constrain the token used for the OpenBao API, but they
+cannot constrain the Kubernetes API access of the operator that holds that
+token. Kubernetes namespace names also do not automatically create or select an
+OpenBao namespace.
+
+Harbor Operator demonstrates a useful deployment-level `watchNamespaces`
+control, while Infisical Entity Operator adds explicit external organization
+ownership. OpenBao Entity Operator already has same-namespace Kubernetes
+references and immutable OpenBao namespace routing on `OpenBaoConnection`.
+
+## Decision
+
+The first tenant-boundary slice uses two existing platform primitives:
+
+1. `watchNamespaces` scopes the manager cache and the Helm chart's manager
+   permissions to an explicit list of Kubernetes namespaces. The chart binds
+   its generated manager `ClusterRole` with one `RoleBinding` per listed
+   namespace and omits the manager `ClusterRoleBinding`. An empty list preserves
+   the cluster-wide trusted-platform installation.
+2. The selected `OpenBaoConnection` remains responsible for the external
+   boundary. Platform administrators should provision an OpenBao namespace and
+   least-privilege ACL policy there, then authenticate the operator with a
+   token, AppRole, or Kubernetes Auth role that is limited to that namespace.
+
+The operator will not add Kyverno as a runtime dependency, create an OpenBao
+namespace lifecycle CRD, or add a first-class organization/tenant hierarchy in
+this slice. Kubernetes RBAC and optional admission policy remain the platform's
+controls for who may create connections, credentials, resource kinds, names,
+and deletion policies.
+
+## Consequences
+
+- A separately installed operator can be limited to the Kubernetes namespaces
+  and Secrets it must access, while OpenBao ACLs limit its external mutations.
+- The default chart remains compatible with existing cluster-wide deployments.
+- `watchNamespaces` is a runtime and RBAC boundary, not a complete hostile
+  multi-tenancy model. A tenant must not be allowed to create arbitrary
+  `OpenBaoConnection` objects or credential Secrets when the operator's
+  external identity is platform-owned; use Kubernetes RBAC or admission policy
+  for that authoring boundary.
+- OpenBao namespaces must exist and be permissioned outside this operator. The
+  operator deliberately does not manage their lifecycle.
+- A future fixed-connection or first-class OpenBao domain resource would need a
+  new decision after a concrete use case demonstrates that platform RBAC and
+  per-installation deployment scope are insufficient.

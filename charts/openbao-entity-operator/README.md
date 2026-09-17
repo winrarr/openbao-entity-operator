@@ -43,6 +43,22 @@ Set `serviceAccount.automountServiceAccountToken: false` only when every
 connection uses another authentication method. `caBundleSecretRef` may be used
 with either authentication method when OpenBao uses a private CA.
 
+Set `watchNamespaces` to scope one installation to an explicit namespace
+allowlist:
+
+```yaml
+watchNamespaces:
+  - team-a
+  - team-b
+```
+
+The chart passes the allowlist to the manager cache and binds the manager
+ClusterRole with a RoleBinding in each listed namespace. An empty list keeps
+the default cluster-wide installation and ClusterRoleBinding. The scope limits
+the operator's Kubernetes reads and watches; use an OpenBao namespace and a
+least-privilege ACL policy on the selected connection for the external identity
+boundary.
+
 When secure metrics are enabled, the chart creates the authentication and
 authorization RBAC needed by controller-runtime. It creates a metrics reader
 ClusterRole but does not bind it by default because the chart cannot infer the

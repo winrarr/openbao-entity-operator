@@ -31,6 +31,15 @@
     "leaderElection": { "type": "boolean" },
     "enableHTTP2": { "type": "boolean" },
     "healthProbeBindAddress": { "type": "string", "minLength": 1 },
+    "watchNamespaces": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+        "maxLength": 63
+      },
+      "description": "Namespaces this operator watches. Empty watches all namespaces."
+    },
     "metrics": {
       "type": "object",
       "additionalProperties": false,
