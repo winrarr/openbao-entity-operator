@@ -233,22 +233,18 @@ func (r *OpenBaoGroupReconciler) reconcileDeletion(ctx context.Context, group *o
 	if groupDeletionPolicy(group) != openbaov1alpha1.DeletionPolicyDelete || group.Status.ID == "" {
 		return ctrl.Result{}, removeFinalizer(ctx, r.Client, group)
 	}
+	before := group.Status.DeepCopy()
+	group.Status.ObservedGeneration = group.Generation
 	connection, err := resolveConnection(ctx, r.Client, group.Namespace, group.Spec.ConnectionRef)
 	if err != nil {
-		if isNotFound(err) {
-			return removeFinalizerAfterDependencyLoss(ctx, r.Client, group, "OpenBaoConnection", err)
-		}
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, group, before, &group.Status, &group.Status.Conditions, group.Generation, reasonCleanupDependencyUnavailable, cleanupDependencyError(ctx, group, "OpenBaoConnection", err))
 	}
 	apiClient, err := r.clientFor(ctx, connection)
 	if err != nil {
-		if isNotFound(err) {
-			return removeFinalizerAfterDependencyLoss(ctx, r.Client, group, "OpenBaoConnection credentials", err)
-		}
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, group, before, &group.Status, &group.Status.Conditions, group.Generation, reasonCleanupDependencyUnavailable, cleanupDependencyError(ctx, group, "OpenBaoConnection credentials", err))
 	}
 	if err := apiClient.DeleteGroup(ctx, group.Status.ID); err != nil && !isNotFound(err) {
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, group, before, &group.Status, &group.Status.Conditions, group.Generation, "CleanupFailed", err)
 	}
 	return ctrl.Result{}, removeFinalizer(ctx, r.Client, group)
 }

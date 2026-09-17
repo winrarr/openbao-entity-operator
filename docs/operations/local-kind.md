@@ -23,6 +23,7 @@ The target builds the operator image, installs the committed Helm chart, and the
 - configures OpenBao AppRole and verifies a real role ID and Secret ID login;
 - verifies one successful ACL policy and entity graph, including policy status version/hash and entity ID persistence;
 - verifies one entity alias binding and one internal group membership against the live OpenBao API;
+- verifies that a Delete-policy entity retains its finalizer while a token credential is unavailable, then completes external cleanup after the credential is restored;
 - provisions two isolated OpenBao namespaces and platform-owned Kubernetes Auth
   connections;
 - verifies tenant ServiceAccounts cannot read Secrets, manage connections, or
@@ -44,10 +45,9 @@ successful run. Do not point this workflow at a shared OpenBao deployment.
 
 The root token is used only to bootstrap the disposable server and configure the
 test auth methods. The main connection and resource graph use Kubernetes Auth
-through the projected operator ServiceAccount JWT, while a separate connection
-proves AppRole credential loading. Token-authenticated connection behavior is
-covered by HTTP and reconciliation tests rather than by duplicated live
-fixtures.
+through the projected operator ServiceAccount JWT, while separate connections
+prove AppRole credential loading and token-credential recovery during
+Delete-policy cleanup.
 
 The default CNI is the recommended first run because the scenarios test reconciliation and API behavior. It does not prove NetworkPolicy enforcement. To use Cilium, create the cluster with:
 
@@ -82,6 +82,31 @@ finalizer so the failure is visible.
 
 Set `KEEP_TEST_RESOURCES=true` to retain the namespace after a successful run too. Do not print or copy the `openbao-dev-token` Secret.
 
+## Operator resilience profile
+
+```sh
+make kind-e2e-resilience
+```
+
+This opt-in profile keeps the default Kind/OpenBao setup as the platform environment, then installs the operator with a watch scope limited to a separate test namespace. It provisions a disposable one-node OpenBao fixture with a PVC, Raft storage, a locally generated CA, and a TLS listener. The fixture is bootstrapped out of band and gives the operator only a non-root token policy.
+
+The assertions are intentionally operator-focused:
+
+- a token-authenticated `OpenBaoConnection` becomes Ready over TLS with the referenced CA Secret;
+- an `OpenBaoPolicy` reconciles through that connection;
+- a new policy reconciles after the OpenBao Pod is restarted;
+- revoking token A makes the connection lose readiness, replacing the Kubernetes Secret with token B restores readiness, and a new policy reconciles with token B.
+
+The PVC, Raft initialization, unseal operation, TLS certificate generation, root bootstrap token, and policy creation are fixture plumbing. This profile does not test OpenBao storage correctness, Raft correctness, ACL semantics, HA/standby behavior, or backup and restore. Those are not operator claims.
+
+The resilience fixture is retained when the target fails so logs and status can be inspected. Clean it and restore the normal cluster-wide Helm installation with:
+
+```sh
+make kind-e2e-resilience-clean
+```
+
+Do not point this workflow at a shared OpenBao deployment. The default values use `openbao-entity-operator-persistent` for the fixture namespace and `openbao-entity-operator-resilience` for the test namespace; both can be overridden when the names are available only in the disposable cluster.
+
 ## Cleanup
 
 Delete only the named disposable cluster:
@@ -96,6 +121,8 @@ This removes the local OpenBao data, token Secret, test resources, and operator 
 
 Useful overrides include `KIND_CLUSTER`, `KIND_NODE_IMAGE`,
 `E2E_TEST_NAMESPACE`, `E2E_TENANT_B_NAMESPACE`, `E2E_OUTSIDE_NAMESPACE`,
-`OPENBAO_IMAGE`, `OPENBAO_NAMESPACE`, `OPENBAO_TOKEN_SECRET`, and
-`CILIUM_VERSION`. The Cilium mode requires Helm and uses the pinned Cilium
-chart version from the root Makefile.
+`OPENBAO_IMAGE`, `OPENBAO_NAMESPACE`, `OPENBAO_TOKEN_SECRET`,
+`PERSISTENT_OPENBAO_NAMESPACE`, `PERSISTENT_OPENBAO_DEPLOYMENT`,
+`PERSISTENT_OPENBAO_SERVICE`, `PERSISTENT_OPENBAO_TLS_SECRET`,
+`PERSISTENT_E2E_NAMESPACE`, and `CILIUM_VERSION`. The Cilium mode requires
+Helm and uses the pinned Cilium chart version from the root Makefile.

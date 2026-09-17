@@ -162,6 +162,40 @@ func TestPolicyReconcilerAppliesDeletionPolicy(t *testing.T) {
 	}
 }
 
+func TestPolicyReconcilerRetainsFinalizerWhenConnectionIsMissing(t *testing.T) {
+	policy := &openbaov1alpha1.OpenBaoPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       testPolicyName,
+			Namespace:  testNamespace,
+			Finalizers: []string{finalizerName},
+		},
+		Spec: openbaov1alpha1.OpenBaoPolicySpec{
+			ConnectionRef:  openbaov1alpha1.OpenBaoConnectionReference{Name: testConnectionName},
+			DeletionPolicy: openbaov1alpha1.DeletionPolicyDelete,
+			Rules:          testPolicyRules,
+		},
+		Status: openbaov1alpha1.OpenBaoPolicyStatus{Name: testPolicyName},
+	}
+	kubeClient := newTestClient(policy)
+	reconciler := newPolicyReconciler(kubeClient, &fakePolicyClient{})
+
+	result, err := reconciler.reconcileDeletion(context.Background(), policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.RequeueAfter != dependencyRetry {
+		t.Fatalf("result = %#v, want retry after %s", result, dependencyRetry)
+	}
+	var got openbaov1alpha1.OpenBaoPolicy
+	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(policy), &got); err != nil {
+		t.Fatal(err)
+	}
+	assertCleanupRequired(t, got.Status.Conditions)
+	if len(got.Finalizers) != 1 || got.Finalizers[0] != finalizerName {
+		t.Fatalf("finalizers = %v, want %q retained", got.Finalizers, finalizerName)
+	}
+}
+
 func newPolicyReconciler(kubeClient client.Client, baoClient *fakePolicyClient) *OpenBaoPolicyReconciler {
 	return &OpenBaoPolicyReconciler{
 		Client: kubeClient,

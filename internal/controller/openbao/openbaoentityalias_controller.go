@@ -233,22 +233,18 @@ func (r *OpenBaoEntityAliasReconciler) reconcileDeletion(ctx context.Context, al
 	if aliasDeletionPolicy(alias) != openbaov1alpha1.DeletionPolicyDelete || alias.Status.ID == "" {
 		return ctrl.Result{}, removeFinalizer(ctx, r.Client, alias)
 	}
+	before := alias.Status.DeepCopy()
+	alias.Status.ObservedGeneration = alias.Generation
 	connection, err := resolveConnection(ctx, r.Client, alias.Namespace, alias.Spec.ConnectionRef)
 	if err != nil {
-		if isNotFound(err) {
-			return removeFinalizerAfterDependencyLoss(ctx, r.Client, alias, "OpenBaoConnection", err)
-		}
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, alias, before, &alias.Status, &alias.Status.Conditions, alias.Generation, reasonCleanupDependencyUnavailable, cleanupDependencyError(ctx, alias, "OpenBaoConnection", err))
 	}
 	apiClient, err := r.clientFor(ctx, connection)
 	if err != nil {
-		if isNotFound(err) {
-			return removeFinalizerAfterDependencyLoss(ctx, r.Client, alias, "OpenBaoConnection credentials", err)
-		}
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, alias, before, &alias.Status, &alias.Status.Conditions, alias.Generation, reasonCleanupDependencyUnavailable, cleanupDependencyError(ctx, alias, "OpenBaoConnection credentials", err))
 	}
 	if err := apiClient.DeleteEntityAlias(ctx, alias.Status.ID); err != nil && !isNotFound(err) {
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, alias, before, &alias.Status, &alias.Status.Conditions, alias.Generation, "CleanupFailed", err)
 	}
 	return ctrl.Result{}, removeFinalizer(ctx, r.Client, alias)
 }

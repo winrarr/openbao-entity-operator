@@ -32,6 +32,12 @@ OPERATOR_NAMESPACE ?= openbao-entity-operator-system
 E2E_TEST_NAMESPACE ?= openbao-entity-operator-e2e
 E2E_TENANT_B_NAMESPACE ?= openbao-entity-operator-e2e-b
 E2E_OUTSIDE_NAMESPACE ?= openbao-entity-operator-outside
+PERSISTENT_OPENBAO_NAMESPACE ?= openbao-entity-operator-persistent
+PERSISTENT_OPENBAO_DEPLOYMENT ?= openbao-persistent
+PERSISTENT_OPENBAO_SERVICE ?= openbao-persistent
+PERSISTENT_OPENBAO_TLS_SECRET ?= openbao-persistent-tls
+PERSISTENT_OPENBAO_BOOTSTRAP_SECRET ?= openbao-persistent-bootstrap
+PERSISTENT_E2E_NAMESPACE ?= openbao-entity-operator-resilience
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
@@ -353,6 +359,18 @@ kind-e2e: ## Run the live OpenBao reconciliation workflow in Kind.
 .PHONY: kind-e2e-clean
 kind-e2e-clean: kind ## Remove only the failed live E2E test resources.
 	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" TENANT_B_NAMESPACE="$(E2E_TENANT_B_NAMESPACE)" OUTSIDE_NAMESPACE="$(E2E_OUTSIDE_NAMESPACE)" ./hack/cleanup-kind-e2e.sh
+
+.PHONY: kind-e2e-resilience
+kind-e2e-resilience: kind-deploy ## Run focused operator recovery scenarios against a persistent TLS fixture in Kind.
+	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" create namespace "$(PERSISTENT_E2E_NAMESPACE)" --dry-run=client -o yaml | $(KUBECTL) --context="kind-$(KIND_CLUSTER)" apply -f -
+	$(MAKE) HELM_INSTALL_ARGS="--set-string watchNamespaces[0]=$(PERSISTENT_E2E_NAMESPACE)" KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" helm-install
+	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" OPENBAO_IMAGE="$(OPENBAO_IMAGE)" PERSISTENT_OPENBAO_NAMESPACE="$(PERSISTENT_OPENBAO_NAMESPACE)" PERSISTENT_OPENBAO_DEPLOYMENT="$(PERSISTENT_OPENBAO_DEPLOYMENT)" PERSISTENT_OPENBAO_SERVICE="$(PERSISTENT_OPENBAO_SERVICE)" PERSISTENT_OPENBAO_TLS_SECRET="$(PERSISTENT_OPENBAO_TLS_SECRET)" PERSISTENT_OPENBAO_BOOTSTRAP_SECRET="$(PERSISTENT_OPENBAO_BOOTSTRAP_SECRET)" PERSISTENT_E2E_NAMESPACE="$(PERSISTENT_E2E_NAMESPACE)" OPERATOR_NAMESPACE="$(OPERATOR_NAMESPACE)" OPERATOR_DEPLOYMENT="$(PROJECT_NAME)" KEEP_TEST_RESOURCES=true ./hack/e2e-operator-resilience.sh
+	$(MAKE) KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" PERSISTENT_OPENBAO_NAMESPACE="$(PERSISTENT_OPENBAO_NAMESPACE)" PERSISTENT_E2E_NAMESPACE="$(PERSISTENT_E2E_NAMESPACE)" kind-e2e-resilience-clean
+
+.PHONY: kind-e2e-resilience-clean
+kind-e2e-resilience-clean: kind ## Remove the retained operator resilience fixture resources.
+	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" PERSISTENT_OPENBAO_NAMESPACE="$(PERSISTENT_OPENBAO_NAMESPACE)" PERSISTENT_E2E_NAMESPACE="$(PERSISTENT_E2E_NAMESPACE)" ./hack/cleanup-kind-operator-resilience.sh
+	$(MAKE) HELM_INSTALL_ARGS="" KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" helm-install
 
 .PHONY: kind-refresh
 kind-refresh: ## Rebuild and redeploy the operator in Kind.

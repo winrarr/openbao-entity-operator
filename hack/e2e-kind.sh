@@ -5,11 +5,14 @@ KUBECTL=${KUBECTL:-kubectl}
 KUBE_CONTEXT=${KUBE_CONTEXT:-kind-openbao-entity-operator}
 OPENBAO_NAMESPACE=${OPENBAO_NAMESPACE:-openbao}
 OPENBAO_DEPLOYMENT=${OPENBAO_DEPLOYMENT:-openbao}
+OPENBAO_TOKEN_SECRET=${OPENBAO_TOKEN_SECRET:-openbao-dev-token}
+OPENBAO_TOKEN_KEY=${OPENBAO_TOKEN_KEY:-token}
 TEST_NAMESPACE=${TEST_NAMESPACE:-openbao-entity-operator-e2e}
 TENANT_B_NAMESPACE=${TENANT_B_NAMESPACE:-openbao-entity-operator-e2e-b}
 OUTSIDE_NAMESPACE=${OUTSIDE_NAMESPACE:-openbao-entity-operator-outside}
 OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-openbao-entity-operator-system}
 operator_deployment=${OPERATOR_DEPLOYMENT:-openbao-entity-operator}
+CLEANUP_TOKEN_SECRET=${CLEANUP_TOKEN_SECRET:-e2e-cleanup-token}
 KEEP_TEST_RESOURCES=${KEEP_TEST_RESOURCES:-false}
 cleanup_script=${CLEANUP_SCRIPT:-hack/cleanup-kind-e2e.sh}
 
@@ -70,6 +73,15 @@ openbao_cli_stdin() {
     env BAO_ADDR=http://127.0.0.1:8200 bao "$@"
 }
 
+copy_openbao_token_secret() {
+  kubectl_cmd -n "${OPENBAO_NAMESPACE}" get secret "${OPENBAO_TOKEN_SECRET}" -o json | jq \
+    --arg namespace "${TEST_NAMESPACE}" \
+    --arg name "${CLEANUP_TOKEN_SECRET}" \
+    'del(.metadata.creationTimestamp, .metadata.managedFields, .metadata.ownerReferences, .metadata.resourceVersion, .metadata.uid) |
+     .metadata.namespace = $namespace |
+     .metadata.name = $name' | kubectl_cmd apply -f - >/dev/null
+}
+
 openbao_list_ids() {
   local path="$1"
   openbao_cli list -format=json "${path}" 2>/dev/null | jq -r \
@@ -114,7 +126,7 @@ reset_remote_test_objects() {
   for name in \
     e2e-entity e2e-created e2e-adopt e2e-group-created-member e2e-unmanaged-member \
     e2e-child-member e2e-group-child-member e2e-conflict-alias-target \
-    e2e-orphan-alias-target e2e-conflict e2e-orphan; do
+    e2e-orphan-alias-target e2e-conflict e2e-orphan e2e-cleanup; do
     openbao_cli delete "identity/entity/name/${name}" >/dev/null 2>&1 || true
   done
 
@@ -285,6 +297,20 @@ spec:
 EOF
 wait_ready openbaoconnection/openbao-approle
 
+copy_openbao_token_secret
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: e2e-cleanup-token
+spec:
+  address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
+  tokenSecretRef:
+    name: ${CLEANUP_TOKEN_SECRET}
+    key: ${OPENBAO_TOKEN_KEY}
+EOF
+wait_ready openbaoconnection/e2e-cleanup-token
+
 cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1
 kind: OpenBaoPolicy
@@ -380,5 +406,32 @@ membership_member_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaogroupmembe
 }
 remote_group "${group_id}" | jq -e --arg entity_id "${entity_id}" \
   '(.data.member_entity_ids // []) | index($entity_id) != null' >/dev/null
+
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEntity
+metadata:
+  name: e2e-cleanup
+spec:
+  connectionRef:
+    name: e2e-cleanup-token
+  deletionPolicy: Delete
+EOF
+wait_ready openbaoentity/e2e-cleanup
+cleanup_entity_id="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentity/e2e-cleanup -o jsonpath='{.status.id}')"
+[[ -n "${cleanup_entity_id}" ]] || { echo "cleanup entity did not publish an ID" >&2; exit 1; }
+
+kubectl_cmd -n "${TEST_NAMESPACE}" delete secret "${CLEANUP_TOKEN_SECRET}" --wait=true >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaoentity/e2e-cleanup --wait=false >/dev/null
+wait_for_jsonpath openbaoentity/e2e-cleanup '{.status.conditions[?(@.type=="CleanupRequired")].status}' True
+finalizer="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaoentity/e2e-cleanup -o jsonpath='{.metadata.finalizers[0]}')"
+[[ -n "${finalizer}" ]] || { echo "cleanup entity lost its finalizer while its credential was unavailable" >&2; exit 1; }
+
+copy_openbao_token_secret
+kubectl_cmd -n "${TEST_NAMESPACE}" wait --for=delete openbaoentity/e2e-cleanup --timeout=5m >/dev/null
+if openbao_cli read "identity/entity/id/${cleanup_entity_id}" >/dev/null 2>&1; then
+  echo "cleanup entity still exists in OpenBao after credential recovery" >&2
+  exit 1
+fi
 
 echo "Kind/OpenBao smoke and integration scenarios passed"

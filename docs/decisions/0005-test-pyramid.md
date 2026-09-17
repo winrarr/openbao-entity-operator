@@ -30,8 +30,8 @@ Use three complementary verification layers:
 
 The live suite should not duplicate every creation-policy, deletion-policy,
 drift, conflict, or dependency-loss branch. New behavior belongs in unit and
-HTTP contract tests first; add a live scenario only when it proves wiring that
-those tests cannot observe.
+HTTP contract tests first; add a focused live scenario only when it proves
+wiring or recovery behavior that those tests cannot observe.
 
 ## Consequences
 

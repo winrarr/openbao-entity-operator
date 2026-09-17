@@ -74,13 +74,15 @@ func NewConnectionClientCache() *ConnectionClientCache {
 }
 
 const (
-	finalizerName      = "openbao.openbao-operator.io/finalizer"
-	dependencyRetry    = 15 * time.Second
-	defaultDriftCheck  = 2 * time.Minute
-	conditionReady     = "Ready"
-	conditionStalled   = "Stalled"
-	reasonReconciled   = "Reconciled"
-	reasonReconcileErr = "ReconcileError"
+	finalizerName                      = "openbao.openbao-operator.io/finalizer"
+	dependencyRetry                    = 15 * time.Second
+	defaultDriftCheck                  = 2 * time.Minute
+	conditionReady                     = "Ready"
+	conditionStalled                   = "Stalled"
+	conditionCleanup                   = "CleanupRequired"
+	reasonReconciled                   = "Reconciled"
+	reasonReconcileErr                 = "ReconcileError"
+	reasonCleanupDependencyUnavailable = "CleanupDependencyUnavailable"
 )
 
 func setCondition(conditions *[]metav1.Condition, condition metav1.Condition) {
@@ -144,6 +146,18 @@ func markStalled(conditions *[]metav1.Condition, generation int64, reason string
 		Status:             metav1.ConditionTrue,
 		Reason:             reason,
 		Message:            message,
+		ObservedGeneration: generation,
+		LastTransitionTime: metav1.Now(),
+	})
+}
+
+func markCleanupFailure(conditions *[]metav1.Condition, generation int64, reason string, err error) {
+	markStalled(conditions, generation, reason, err)
+	setCondition(conditions, metav1.Condition{
+		Type:               conditionCleanup,
+		Status:             metav1.ConditionTrue,
+		Reason:             reason,
+		Message:            err.Error(),
 		ObservedGeneration: generation,
 		LastTransitionTime: metav1.Now(),
 	})
@@ -351,9 +365,18 @@ func removeFinalizer(ctx context.Context, kubeClient client.Client, obj client.O
 	return kubeClient.Update(ctx, obj)
 }
 
-func removeFinalizerAfterDependencyLoss(ctx context.Context, kubeClient client.Client, obj client.Object, dependency string, err error) (ctrl.Result, error) {
-	log.FromContext(ctx).Error(err, "Releasing deletion finalizer because cleanup dependency is unavailable", "dependency", dependency, "resource", client.ObjectKeyFromObject(obj))
-	return ctrl.Result{}, removeFinalizer(ctx, kubeClient, obj)
+func cleanupDependencyError(ctx context.Context, obj client.Object, dependency string, err error) error {
+	cleanupErr := fmt.Errorf("external cleanup is blocked because %s is unavailable: %w", dependency, err)
+	log.FromContext(ctx).Error(cleanupErr, "Retaining deletion finalizer until cleanup dependency is restored", "dependency", dependency, "resource", client.ObjectKeyFromObject(obj))
+	return cleanupErr
+}
+
+func recordCleanupFailure(ctx context.Context, kubeClient client.Client, obj client.Object, before, after any, conditions *[]metav1.Condition, generation int64, reason string, err error) (ctrl.Result, error) {
+	markCleanupFailure(conditions, generation, reason, err)
+	if statusErr := updateStatusIfChanged(ctx, kubeClient, obj, before, after); statusErr != nil {
+		return ctrl.Result{}, statusErr
+	}
+	return ctrl.Result{RequeueAfter: dependencyRetry}, nil
 }
 
 func normalizedPolicies(policies []string) []string {

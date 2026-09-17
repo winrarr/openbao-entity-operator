@@ -36,9 +36,10 @@ mutation. The finalizer is removed only after OpenBao confirms deletion or the
 object is already absent.
 
 If the connection or credential Secret disappears first, the controller
-releases the finalizer so Kubernetes deletion cannot deadlock indefinitely. The
-external object may remain and must then be cleaned up through an administrative
-OpenBao path.
+retains the finalizer, records `CleanupRequired=True` and `Stalled=True`, and
+retries. Restore the same connection or credential so the operator can prove
+that the external object was deleted. This intentionally keeps the Kubernetes
+object `Terminating` rather than silently orphaning the external object.
 
 Inspect a blocked resource before taking manual action:
 
@@ -49,4 +50,5 @@ kubectl get events --sort-by=.lastTimestamp
 ```
 
 Do not remove a finalizer merely to hide a connectivity problem when external
-cleanup is required.
+cleanup is required. Manual finalizer removal is an administrative override
+that can orphan the external object.

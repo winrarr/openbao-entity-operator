@@ -168,7 +168,7 @@ func TestEntityReconcilerPersistsReacquiredID(t *testing.T) {
 	}
 }
 
-func TestEntityReconcilerReleasesFinalizerWhenConnectionIsMissing(t *testing.T) {
+func TestEntityReconcilerRetainsFinalizerWhenConnectionIsMissing(t *testing.T) {
 	entity := &openbaov1alpha1.OpenBaoEntity{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       testEntityName,
@@ -188,19 +188,20 @@ func TestEntityReconcilerReleasesFinalizerWhenConnectionIsMissing(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != (ctrl.Result{}) {
-		t.Fatalf("result = %#v, want empty result", result)
+	if result.RequeueAfter != dependencyRetry {
+		t.Fatalf("result = %#v, want retry after %s", result, dependencyRetry)
 	}
 	var got openbaov1alpha1.OpenBaoEntity
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(entity), &got); err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Finalizers) != 0 {
-		t.Fatalf("finalizers = %v, want none", got.Finalizers)
+	assertCleanupRequired(t, got.Status.Conditions)
+	if len(got.Finalizers) != 1 || got.Finalizers[0] != finalizerName {
+		t.Fatalf("finalizers = %v, want %q retained", got.Finalizers, finalizerName)
 	}
 }
 
-func TestEntityReconcilerReleasesFinalizerWhenTokenSecretIsMissing(t *testing.T) {
+func TestEntityReconcilerRetainsFinalizerUntilTokenSecretIsRestored(t *testing.T) {
 	connection := readyConnection()
 	entity := &openbaov1alpha1.OpenBaoEntity{
 		ObjectMeta: metav1.ObjectMeta{
@@ -221,15 +222,41 @@ func TestEntityReconcilerReleasesFinalizerWhenTokenSecretIsMissing(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != (ctrl.Result{}) {
-		t.Fatalf("result = %#v, want empty result", result)
+	if result.RequeueAfter != dependencyRetry {
+		t.Fatalf("result = %#v, want retry after %s", result, dependencyRetry)
 	}
 	var got openbaov1alpha1.OpenBaoEntity
 	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(entity), &got); err != nil {
 		t.Fatal(err)
 	}
+	assertCleanupRequired(t, got.Status.Conditions)
+	if len(got.Finalizers) != 1 || got.Finalizers[0] != finalizerName {
+		t.Fatalf("finalizers = %v, want %q retained", got.Finalizers, finalizerName)
+	}
+
+	if err := kubeClient.Create(context.Background(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: testTokenKey, Namespace: testNamespace},
+		Data:       map[string][]byte{testTokenKey: []byte("token")},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	baoClient := &fakeEntityClient{entity: &openbaoclient.Entity{ID: testEntityID, Name: testEntityName}}
+	reconciler.NewClient = func(context.Context, *openbaov1alpha1.OpenBaoConnection) (EntityClient, error) {
+		return baoClient, nil
+	}
+	if result, err := reconciler.reconcileDeletion(context.Background(), entity); err != nil {
+		t.Fatal(err)
+	} else if result != (ctrl.Result{}) {
+		t.Fatalf("result after restoring credential = %#v, want empty result", result)
+	}
+	if baoClient.deleteCalls != 1 {
+		t.Fatalf("delete calls after restoring credential = %d, want 1", baoClient.deleteCalls)
+	}
+	if err := kubeClient.Get(context.Background(), client.ObjectKeyFromObject(entity), &got); err != nil {
+		t.Fatal(err)
+	}
 	if len(got.Finalizers) != 0 {
-		t.Fatalf("finalizers = %v, want none", got.Finalizers)
+		t.Fatalf("finalizers after restoring credential = %v, want none", got.Finalizers)
 	}
 }
 
@@ -427,6 +454,27 @@ func conditionTrue(conditions []metav1.Condition) bool {
 	return condition != nil && condition.Status == metav1.ConditionTrue
 }
 
+func assertCleanupRequired(t *testing.T, conditions []metav1.Condition) {
+	t.Helper()
+	cleanup := findConditionByType(conditions, conditionCleanup)
+	if cleanup == nil || cleanup.Status != metav1.ConditionTrue || cleanup.Reason != reasonCleanupDependencyUnavailable {
+		t.Fatalf("CleanupRequired condition = %#v, want True/%s", cleanup, reasonCleanupDependencyUnavailable)
+	}
+	stalled := findConditionByType(conditions, conditionStalled)
+	if stalled == nil || stalled.Status != metav1.ConditionTrue {
+		t.Fatalf("Stalled condition = %#v, want True", stalled)
+	}
+}
+
+func findConditionByType(conditions []metav1.Condition, conditionType string) *metav1.Condition {
+	for i := range conditions {
+		if conditions[i].Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
 func findCondition(conditions []metav1.Condition) *metav1.Condition {
 	for i := range conditions {
 		if conditions[i].Type == conditionReady {
@@ -455,6 +503,7 @@ func (f *fakeConnectionClient) LookupSelf(context.Context) error {
 type fakeEntityClient struct {
 	entity      *openbaoclient.Entity
 	createCalls int
+	deleteCalls int
 }
 
 type reacquiringEntityClient struct {
@@ -519,7 +568,10 @@ func (f *fakeEntityClient) UpdateEntity(_ context.Context, id string, request op
 	return f.entity, nil
 }
 
-func (f *fakeEntityClient) DeleteEntity(context.Context, string) error { return nil }
+func (f *fakeEntityClient) DeleteEntity(context.Context, string) error {
+	f.deleteCalls++
+	return nil
+}
 
 type fakePolicyClient struct {
 	policies    map[string]*openbaoclient.Policy

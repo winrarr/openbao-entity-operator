@@ -164,22 +164,18 @@ func (r *OpenBaoPolicyReconciler) reconcileDeletion(ctx context.Context, policy 
 	if policyDeletionPolicy(policy) != openbaov1alpha1.DeletionPolicyDelete {
 		return ctrl.Result{}, removeFinalizer(ctx, r.Client, policy)
 	}
+	before := policy.Status.DeepCopy()
+	policy.Status.ObservedGeneration = policy.Generation
 	connection, err := resolveConnection(ctx, r.Client, policy.Namespace, policy.Spec.ConnectionRef)
 	if err != nil {
-		if isNotFound(err) {
-			return removeFinalizerAfterDependencyLoss(ctx, r.Client, policy, "OpenBaoConnection", err)
-		}
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, policy, before, &policy.Status, &policy.Status.Conditions, policy.Generation, reasonCleanupDependencyUnavailable, cleanupDependencyError(ctx, policy, "OpenBaoConnection", err))
 	}
 	apiClient, err := r.clientFor(ctx, connection)
 	if err != nil {
-		if isNotFound(err) {
-			return removeFinalizerAfterDependencyLoss(ctx, r.Client, policy, "OpenBaoConnection credentials", err)
-		}
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, policy, before, &policy.Status, &policy.Status.Conditions, policy.Generation, reasonCleanupDependencyUnavailable, cleanupDependencyError(ctx, policy, "OpenBaoConnection credentials", err))
 	}
 	if err := apiClient.DeletePolicy(ctx, policy.Name); err != nil && !isNotFound(err) {
-		return ctrl.Result{}, err
+		return recordCleanupFailure(ctx, r.Client, policy, before, &policy.Status, &policy.Status.Conditions, policy.Generation, "CleanupFailed", err)
 	}
 	return ctrl.Result{}, removeFinalizer(ctx, r.Client, policy)
 }

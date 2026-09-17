@@ -65,8 +65,11 @@ kubectl get events --sort-by=.lastTimestamp
 ```
 
 `deletionPolicy: Delete` requires OpenBao access. If the connection or its
-credentials disappeared first, the controller is designed to release the
-finalizer and leave the external object for explicit administrative cleanup.
+credentials disappeared first, the controller retains the finalizer and sets
+`CleanupRequired=True` until the dependency is restored. Recreate the same
+connection or credential Secret, then inspect the resource again. Remove a
+finalizer manually only when intentionally accepting that the external object
+may be orphaned.
 
 ## Local Kind failures
 
