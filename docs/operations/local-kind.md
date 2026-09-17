@@ -23,13 +23,24 @@ The target builds the operator image, installs the committed Helm chart, and the
 - configures OpenBao AppRole and verifies a real role ID and Secret ID login;
 - verifies one successful ACL policy and entity graph, including policy status version/hash and entity ID persistence;
 - verifies one entity alias binding and one internal group membership against the live OpenBao API;
+- provisions two isolated OpenBao namespaces and platform-owned Kubernetes Auth
+  connections;
+- verifies tenant ServiceAccounts cannot read Secrets, manage connections, or
+  access the other tenant's Kubernetes resources;
+- verifies each tenant can reconcile its own policy/entity graph while a token
+  from either OpenBao namespace cannot mutate the other namespace;
 - removes the temporary test namespaces after a successful run.
 
-After a successful run, the target removes the temporary test namespaces and
+After a successful run, the target removes the temporary OpenBao namespaces and
+Kubernetes test resources, then removes the temporary test namespaces and
 restores the operator's default cluster-wide Helm installation. A failed run
 keeps the scoped installation and both test namespaces for inspection.
 
-Each run first removes only the workflow's fixed `e2e-*` OpenBao fixtures from the disposable OpenBao instance. Do not point this workflow at a shared OpenBao deployment.
+Each run first removes only the workflow's fixed `e2e-*` OpenBao fixtures from
+the disposable OpenBao instance. The multi-tenancy scenario uses the fixed
+`openbao-entity-operator-tenant-a` and
+`openbao-entity-operator-tenant-b` namespace names and removes them after a
+successful run. Do not point this workflow at a shared OpenBao deployment.
 
 The root token is used only to bootstrap the disposable server and configure the
 test auth methods. The main connection and resource graph use Kubernetes Auth
@@ -63,7 +74,11 @@ After inspection, remove only the retained E2E resources with the dependency-awa
 make kind-e2e-clean
 ```
 
-The cleanup target deletes membership claims, aliases, policies, groups, entities, and connections in that order, then removes the test namespaces. It stops if a resource remains blocked by a non-recoverable finalizer so the failure is visible. It does not delete external OpenBao objects that were left behind after a missing connection or credential.
+The cleanup target deletes membership claims, aliases, policies, groups,
+entities, and connections in that order, removes the two test namespaces, and
+removes the fixed multi-tenancy OpenBao namespaces when the disposable server
+is available. It stops if a resource remains blocked by a non-recoverable
+finalizer so the failure is visible.
 
 Set `KEEP_TEST_RESOURCES=true` to retain the namespace after a successful run too. Do not print or copy the `openbao-dev-token` Secret.
 
@@ -79,4 +94,8 @@ This removes the local OpenBao data, token Secret, test resources, and operator 
 
 ## Variables
 
-Useful overrides include `KIND_CLUSTER`, `KIND_NODE_IMAGE`, `E2E_TEST_NAMESPACE`, `E2E_OUTSIDE_NAMESPACE`, `OPENBAO_IMAGE`, `OPENBAO_NAMESPACE`, `OPENBAO_TOKEN_SECRET`, and `CILIUM_VERSION`. The Cilium mode requires Helm and uses the pinned Cilium chart version from the root Makefile.
+Useful overrides include `KIND_CLUSTER`, `KIND_NODE_IMAGE`,
+`E2E_TEST_NAMESPACE`, `E2E_TENANT_B_NAMESPACE`, `E2E_OUTSIDE_NAMESPACE`,
+`OPENBAO_IMAGE`, `OPENBAO_NAMESPACE`, `OPENBAO_TOKEN_SECRET`, and
+`CILIUM_VERSION`. The Cilium mode requires Helm and uses the pinned Cilium
+chart version from the root Makefile.

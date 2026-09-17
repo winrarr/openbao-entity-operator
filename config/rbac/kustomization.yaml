@@ -28,3 +28,4 @@ resources:
 - openbao_openbaoconnection_admin_role.yaml
 - openbao_openbaoconnection_editor_role.yaml
 - openbao_openbaoconnection_viewer_role.yaml
+- openbao_tenant_author_role.yaml

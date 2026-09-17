@@ -153,11 +153,11 @@ As a platform operator, I want to scope an operator installation to an explicit 
 Acceptance criteria:
 
 - Given an installation boundary, when resources are created outside its allowed Kubernetes namespaces, then they are not watched or reconciled.
-- Given tenant-scoped credentials and an OpenBao identity domain, when a tenant resource reconciles, then it cannot select another tenant's Secret, connection, or domain.
+- Given platform-owned tenant-scoped connections, credential boundaries, and an OpenBao identity domain, when a tenant resource reconciles, then it cannot select another tenant's Secret, connection, or domain.
 - Given the supported tenant resource kinds and deletion policies, when admission and RBAC are configured, then the allowed operations and external blast radius are explicit and reviewable.
-- Given a separately scoped installation, when it is deployed, then its Kubernetes RBAC and OpenBao permissions are sufficient for its boundary and insufficient for another tenant's boundary.
+- Given a separately scoped installation and the tenant-author RBAC profile, when it is deployed, then its Kubernetes RBAC and OpenBao permissions are sufficient for each declared tenant boundary and insufficient for another tenant's boundary.
 
-Design criteria: explicit watch and reference scope, least-privilege RBAC, stable external-domain binding, clear connection ownership, admission-policy integration, and focused boundary verification.
+Design criteria: explicit watch and reference scope, least-privilege RBAC, platform-owned connection and credential material, stable external-domain binding, admission-policy integration, and focused boundary verification.
 
 ## Design alternatives and recommendation
 
@@ -173,7 +173,7 @@ Design criteria: explicit watch and reference scope, least-privilege RBAC, stabl
 | US-008 | Current | Covered now | Supported later | Authentication is selected at connection construction while identity controllers keep a narrow client interface |
 | US-009 | Current | Covered now | Supported later | A typed policy client keeps the raw document and ownership semantics visible without exposing arbitrary system paths |
 | US-010 | Current | Covered now | Covered now | AppRole extends the connection boundary with lazy credential sources and shared token lease handling |
-| US-011 | Current slice | Covered in part | Covered in part | `watchNamespaces` and scoped Helm RoleBindings cover Kubernetes watch/read scope; connection ownership and tenant resource-kind policy remain platform controls |
+| US-011 | Current slice | Covered now | Covered now | `watchNamespaces`, scoped Helm RoleBindings, the tenant-author RBAC profile, platform-owned connections, OpenBao namespaces, and the two-tenant Kind scenario cover the supported model |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.
 

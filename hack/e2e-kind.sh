@@ -6,6 +6,7 @@ KUBE_CONTEXT=${KUBE_CONTEXT:-kind-openbao-entity-operator}
 OPENBAO_NAMESPACE=${OPENBAO_NAMESPACE:-openbao}
 OPENBAO_DEPLOYMENT=${OPENBAO_DEPLOYMENT:-openbao}
 TEST_NAMESPACE=${TEST_NAMESPACE:-openbao-entity-operator-e2e}
+TENANT_B_NAMESPACE=${TENANT_B_NAMESPACE:-openbao-entity-operator-e2e-b}
 OUTSIDE_NAMESPACE=${OUTSIDE_NAMESPACE:-openbao-entity-operator-outside}
 OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-openbao-entity-operator-system}
 operator_deployment=${OPERATOR_DEPLOYMENT:-openbao-entity-operator}
@@ -24,10 +25,10 @@ kubectl_cmd() {
 cleanup() {
   local exit_code=$?
   if [[ "${KEEP_TEST_RESOURCES}" == true || "${exit_code}" -ne 0 ]]; then
-    echo "Keeping ${TEST_NAMESPACE} for inspection (exit ${exit_code})" >&2
+    echo "Keeping ${TEST_NAMESPACE} and ${TENANT_B_NAMESPACE} for inspection (exit ${exit_code})" >&2
     exit "${exit_code}"
   fi
-  if ! KUBECTL="${KUBECTL}" KUBE_CONTEXT="${KUBE_CONTEXT}" TEST_NAMESPACE="${TEST_NAMESPACE}" OUTSIDE_NAMESPACE="${OUTSIDE_NAMESPACE}" "${cleanup_script}"; then
+  if ! KUBECTL="${KUBECTL}" KUBE_CONTEXT="${KUBE_CONTEXT}" TEST_NAMESPACE="${TEST_NAMESPACE}" TENANT_B_NAMESPACE="${TENANT_B_NAMESPACE}" OUTSIDE_NAMESPACE="${OUTSIDE_NAMESPACE}" OPENBAO_NAMESPACE="${OPENBAO_NAMESPACE}" "${cleanup_script}"; then
     echo "Failed to clean up ${TEST_NAMESPACE}; run make kind-e2e-clean to retry" >&2
     exit 1
   fi
@@ -222,6 +223,7 @@ for crd in openbaoconnections openbaopolicies openbaoentities openbaoentityalias
   kubectl_cmd get crd "${crd}.openbao.openbao-operator.io" >/dev/null
 done
 kubectl_cmd -n "${TEST_NAMESPACE}" get rolebinding "${operator_deployment}-manager" >/dev/null
+kubectl_cmd -n "${TENANT_B_NAMESPACE}" get rolebinding "${operator_deployment}-manager" >/dev/null
 if kubectl_cmd get clusterrolebinding "${operator_deployment}-manager" >/dev/null 2>&1; then
   echo "scoped installation unexpectedly created a manager ClusterRoleBinding" >&2
   exit 1

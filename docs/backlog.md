@@ -4,7 +4,7 @@ These are real outcomes that are intentionally not part of the current supported
 
 ## BL-001: Add explicit tenant-boundary controls
 
-Status: in progress
+Status: complete for the supported platform-owned model
 
 Goal: let platform operators deploy OpenBao Entity Operator with an explicit,
 verifiable boundary for which Kubernetes namespaces, connections, and OpenBao
@@ -33,19 +33,22 @@ Acceptance criteria:
   that set. **Completed for Helm installations with `watchNamespaces`.**
 - A tenant cannot cause the operator to read another tenant's Secret or mutate
   an OpenBao connection or namespace outside the installation's declared
-  boundary.
+  boundary when the documented tenant-author RBAC profile is used. **Covered
+  by the Kind multi-tenancy scenario.**
 - Tenant-manageable resource kinds, naming rules, connection selection, and
   deletion blast radius are documented as enforceable Kubernetes policy, not
   implied by namespace names alone.
 - A separately scoped installation can run with only the Kubernetes RBAC and
-  OpenBao permissions needed for its tenant boundary. **Kubernetes namespace
-  RBAC is implemented; connection ownership remains platform configuration.**
+  OpenBao permissions needed for its tenant boundary. **Covered by scoped
+  manager RoleBindings, the tenant-author ClusterRole, and the Kind
+  multi-tenancy scenario.**
 - Unit and controller tests cover boundary decisions and dependency rejection;
-  a focused live test proves installation scope and one permitted resource
-  graph without duplicating controller state-machine coverage. **The namespace
-  parser and Kind smoke path cover the first slice.**
+  focused live tests prove installation scope, tenant authoring permissions,
+  and two permitted resource graphs without duplicating controller state-machine
+  coverage. **Covered by the scope unit tests and Kind workflows.**
 
-Remaining work is to decide whether a fixed operator-owned connection or a
-first-class OpenBao domain resource is necessary for shared installations. Do
-not add either until the platform RBAC/admission model and a concrete use case
-show that scoped installations plus OpenBao-native ACLs are insufficient.
+The supported boundary intentionally remains platform-configured. Do not add a
+fixed operator-owned connection flag or a first-class OpenBao domain resource
+until a concrete shared-installation use case shows that scoped installations,
+platform-owned connections, Kubernetes RBAC, and OpenBao-native namespaces are
+insufficient.

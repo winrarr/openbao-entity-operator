@@ -1,0 +1,24 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tenant-author-role
+  labels:
+    app.kubernetes.io/name: openbao-entity-operator
+    app.kubernetes.io/managed-by: kustomize
+rules:
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoentities
+  - openbaoentityaliases
+  - openbaogroups
+  - openbaogroupmemberships
+  - openbaopolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch

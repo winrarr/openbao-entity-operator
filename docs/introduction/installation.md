@@ -55,10 +55,12 @@ The chart exposes settings for:
 - resource requests and limits, scheduling, and security contexts;
 - secure controller-runtime metrics and an optional ServiceMonitor;
 - an existing ServiceAccount and projected token automounting;
-- leader election and the health probe address.
+- leader election and the health probe address;
 - `watchNamespaces` to scope a Helm installation to explicit Kubernetes
   namespaces. In scoped mode the chart uses namespace RoleBindings for manager
   permissions; those namespaces must exist before the chart is installed.
+- the unbound `<release-name>-tenant-author-role` ClusterRole for a
+  platform-managed tenant authoring profile.
 
 Inspect the [chart README](https://github.com/winrarr/openbao-entity-operator/blob/main/charts/openbao-entity-operator/README.md)
 and `charts/openbao-entity-operator/values.yaml` in a checkout for the
@@ -80,6 +82,12 @@ helm upgrade --install openbao-entity-operator \
 Use an OpenBao token, AppRole, or Kubernetes Auth role whose ACL policy is
 limited to the corresponding OpenBao namespace. The operator does not create
 or manage OpenBao namespaces.
+
+Create the `OpenBaoConnection` and its credential material as platform-owned
+objects. Bind `<release-name>-tenant-author-role` to tenant ServiceAccounts so
+they can manage identity and policy resources without being able to read or
+change connections or Secrets. See [Multi-tenancy](../reference/multi-tenancy.md)
+for the complete boundary and verification model.
 
 ## Verify the installation
 

@@ -17,7 +17,7 @@ references and immutable OpenBao namespace routing on `OpenBaoConnection`.
 
 ## Decision
 
-The first tenant-boundary slice uses two existing platform primitives:
+The first tenant-boundary slice uses three platform-controlled layers:
 
 1. `watchNamespaces` scopes the manager cache and the Helm chart's manager
    permissions to an explicit list of Kubernetes namespaces. The chart binds
@@ -28,6 +28,10 @@ The first tenant-boundary slice uses two existing platform primitives:
    boundary. Platform administrators should provision an OpenBao namespace and
    least-privilege ACL policy there, then authenticate the operator with a
    token, AppRole, or Kubernetes Auth role that is limited to that namespace.
+3. The chart publishes an unbound tenant-author ClusterRole that grants CRUD
+   access to identity and policy resources only. Platform administrators bind
+   it per tenant namespace; tenant principals do not receive access to
+   OpenBaoConnection objects, connection subresources, or Secrets.
 
 The operator will not add Kyverno as a runtime dependency, create an OpenBao
 namespace lifecycle CRD, or add a first-class organization/tenant hierarchy in
@@ -39,6 +43,8 @@ and deletion policies.
 
 - A separately installed operator can be limited to the Kubernetes namespaces
   and Secrets it must access, while OpenBao ACLs limit its external mutations.
+- A shared trusted manager can serve multiple namespaces without making the
+  platform-owned connections or credential material tenant-authorable.
 - The default chart remains compatible with existing cluster-wide deployments.
 - `watchNamespaces` is a runtime and RBAC boundary, not a complete hostile
   multi-tenancy model. A tenant must not be allowed to create arbitrary
@@ -47,6 +53,9 @@ and deletion policies.
   for that authoring boundary.
 - OpenBao namespaces must exist and be permissioned outside this operator. The
   operator deliberately does not manage their lifecycle.
+- The local Kind workflow verifies two tenant ServiceAccounts, two
+  platform-owned connections, two OpenBao namespaces, and cross-boundary
+  denial in both Kubernetes and OpenBao.
 - A future fixed-connection or first-class OpenBao domain resource would need a
   new decision after a concrete use case demonstrates that platform RBAC and
   per-installation deployment scope are insufficient.

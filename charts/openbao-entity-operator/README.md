@@ -59,6 +59,22 @@ the operator's Kubernetes reads and watches; use an OpenBao namespace and a
 least-privilege ACL policy on the selected connection for the external identity
 boundary.
 
+For a platform-owned connection model, bind the chart's unbound tenant author
+ClusterRole to a tenant ServiceAccount in each allowed namespace:
+
+```sh
+kubectl -n team-a create rolebinding team-a-openbao-author \
+  --clusterrole=openbao-entity-operator-tenant-author-role \
+  --serviceaccount=team-a:team-a-operator
+```
+
+The role grants CRUD access only to `OpenBaoPolicy`, `OpenBaoEntity`,
+`OpenBaoEntityAlias`, `OpenBaoGroup`, and `OpenBaoGroupMembership`. It does not
+grant access to `OpenBaoConnection` objects or Secrets. The platform must
+create and protect each connection and its credential material separately. The
+generated CRD admin/editor roles are intentionally broader and should not be
+bound to an untrusted tenant.
+
 When secure metrics are enabled, the chart creates the authentication and
 authorization RBAC needed by controller-runtime. It creates a metrics reader
 ClusterRole but does not bind it by default because the chart cannot infer the
