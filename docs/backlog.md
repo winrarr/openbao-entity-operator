@@ -4,6 +4,8 @@ These are real outcomes that are intentionally not part of the current supported
 
 ## BL-001: Add explicit tenant-boundary controls
 
+Status: in progress
+
 Goal: let platform operators deploy OpenBao Entity Operator with an explicit,
 verifiable boundary for which Kubernetes namespaces, connections, and OpenBao
 identity domains an installation may manage.
@@ -28,7 +30,7 @@ Acceptance criteria:
 
 - A platform can restrict an installation to an explicit set of Kubernetes
   namespaces, and tests prove it does not watch or reconcile resources outside
-  that set.
+  that set. **Completed for Helm installations with `watchNamespaces`.**
 - A tenant cannot cause the operator to read another tenant's Secret or mutate
   an OpenBao connection or namespace outside the installation's declared
   boundary.
@@ -36,7 +38,14 @@ Acceptance criteria:
   deletion blast radius are documented as enforceable Kubernetes policy, not
   implied by namespace names alone.
 - A separately scoped installation can run with only the Kubernetes RBAC and
-  OpenBao permissions needed for its tenant boundary.
+  OpenBao permissions needed for its tenant boundary. **Kubernetes namespace
+  RBAC is implemented; connection ownership remains platform configuration.**
 - Unit and controller tests cover boundary decisions and dependency rejection;
   a focused live test proves installation scope and one permitted resource
-  graph without duplicating controller state-machine coverage.
+  graph without duplicating controller state-machine coverage. **The namespace
+  parser and Kind smoke path cover the first slice.**
+
+Remaining work is to decide whether a fixed operator-owned connection or a
+first-class OpenBao domain resource is necessary for shared installations. Do
+not add either until the platform RBAC/admission model and a concrete use case
+show that scoped installations plus OpenBao-native ACLs are insufficient.

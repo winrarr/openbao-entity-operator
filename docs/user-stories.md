@@ -144,13 +144,11 @@ Acceptance criteria:
 
 Design criteria: one typed AppRole configuration, separate same-namespace credential references, explicit mount validation, lazy credential reads, external Secret ID rotation ownership, reusable token lease handling, and no arbitrary authentication request payloads.
 
-## Future stories
+## Current stories
 
 ### US-011 — Operate with explicit Kubernetes tenant boundaries
 
 As a platform operator, I want to scope an operator installation to an explicit tenant boundary, so that one tenant cannot use the operator as a confused deputy against another tenant's Kubernetes Secrets or OpenBao identity domain.
-
-Reason to defer: the current namespaced API and OpenBao namespace routing provide useful locality, but the manager's default cluster-wide watch and Secret permissions are intentionally a trusted-platform deployment. Harbor Operator and Infisical Entity Operator demonstrate stronger deployment-level and domain-level tenancy models that need a deliberate OpenBao-specific design.
 
 Acceptance criteria:
 
@@ -175,7 +173,7 @@ Design criteria: explicit watch and reference scope, least-privilege RBAC, stabl
 | US-008 | Current | Covered now | Supported later | Authentication is selected at connection construction while identity controllers keep a narrow client interface |
 | US-009 | Current | Covered now | Supported later | A typed policy client keeps the raw document and ownership semantics visible without exposing arbitrary system paths |
 | US-010 | Current | Covered now | Covered now | AppRole extends the connection boundary with lazy credential sources and shared token lease handling |
-| US-011 | Future | Supported later | Supported later | The current same-namespace model is a safe starting point, but deployment/domain enforcement needs a separate design |
+| US-011 | Current slice | Covered in part | Covered in part | `watchNamespaces` and scoped Helm RoleBindings cover Kubernetes watch/read scope; connection ownership and tenant resource-kind policy remain platform controls |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.
 

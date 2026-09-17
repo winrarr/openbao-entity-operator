@@ -10,6 +10,9 @@ durable documentation:
 - [Infisical Entity Operator security guide](https://github.com/winrarr/infisical-entity-operator/blob/main/docs/reference/security.md)
 - [Infisical organization-scoped identity decision](https://github.com/winrarr/infisical-entity-operator/blob/main/docs/decisions/0006-organization-scoped-identities-for-tenant-principals.md)
 - [Infisical organization tenant-boundary decision](https://github.com/winrarr/infisical-entity-operator/blob/main/docs/decisions/0007-explicit-organization-tenant-boundaries.md)
+- [OpenBao namespaces](https://openbao.org/docs/next/concepts/namespaces/)
+- [OpenBao security model](https://openbao.org/docs/internals/security/)
+- [OpenBao Kubernetes Auth](https://openbao.org/docs/next/auth/kubernetes/)
 
 The OpenBao comparison used the current API types, generated RBAC, controller
 reference resolution, and manager configuration in this repository.
@@ -31,17 +34,28 @@ of the enforcement model.
 
 OpenBao Entity Operator currently has namespaced CRDs, same-namespace object and
 Secret references, and immutable OpenBao namespace routing on
-`OpenBaoConnection`. It has no cluster-scoped connection, watched-namespace
-allowlist, cross-namespace reference setting, or OpenBao namespace lifecycle
-resource. The default manager ClusterRole can read Secrets cluster-wide, so the
-current deployment is intentionally a trusted-platform model.
+`OpenBaoConnection`. It has no cluster-scoped connection, cross-namespace
+reference setting, or OpenBao namespace lifecycle resource. The default manager
+ClusterRole can read Secrets cluster-wide, so an empty-scope deployment remains
+a trusted-platform model. A Helm installation can now set `watchNamespaces` to
+limit both the controller-runtime cache and the manager RoleBindings to an
+explicit Kubernetes namespace set.
+
+OpenBao namespaces are the stronger external boundary: they isolate policies,
+auth methods, entities, groups, tokens, and secret engines, while ACL policies
+default to deny unless a token's associated policies grant a capability. The
+Kubernetes Auth role can additionally bind authentication to specific
+Kubernetes ServiceAccount names and namespaces. These controls are native to
+OpenBao and should be configured on the connection credential rather than
+reimplemented as operator tenant objects.
 
 ## Conclusion
 
 The project has useful namespace-local safety properties and can target an
-already provisioned OpenBao namespace, but it does not yet support the full
-operator-level or domain-level tenancy capabilities represented by the two
-related projects. A future design should decide whether OpenBao tenancy is
-best expressed through scoped operator deployments, first-class connection and
-namespace resources, or both. That decision is intentionally left to the
-multi-tenancy backlog item rather than inferred into the current API.
+already provisioned OpenBao namespace. The accepted first slice is scoped
+operator deployment plus native OpenBao ACL/namespace enforcement; it does not
+attempt to reproduce Infisical's organization hierarchy inside Kubernetes.
+Kyverno remains an optional admission-policy tool for authoring constraints, not
+a replacement for OpenBao ACLs or Kubernetes RBAC. A fixed connection or
+first-class OpenBao domain resource remains deferred until a concrete shared
+installation needs stronger connection ownership than platform RBAC provides.

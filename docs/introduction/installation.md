@@ -56,12 +56,30 @@ The chart exposes settings for:
 - secure controller-runtime metrics and an optional ServiceMonitor;
 - an existing ServiceAccount and projected token automounting;
 - leader election and the health probe address.
+- `watchNamespaces` to scope a Helm installation to explicit Kubernetes
+  namespaces. In scoped mode the chart uses namespace RoleBindings for manager
+  permissions; those namespaces must exist before the chart is installed.
 
 Inspect the [chart README](https://github.com/winrarr/openbao-entity-operator/blob/main/charts/openbao-entity-operator/README.md)
 and `charts/openbao-entity-operator/values.yaml` in a checkout for the
 complete values surface.
 Keep ServiceAccount token automounting enabled when any connection uses
 Kubernetes Auth.
+
+For a tenant-scoped installation, combine `watchNamespaces` with an
+OpenBao-native boundary:
+
+```sh
+helm upgrade --install openbao-entity-operator \
+  charts/openbao-entity-operator \
+  --namespace openbao-entity-operator-system \
+  --create-namespace \
+  --set 'watchNamespaces[0]=team-a'
+```
+
+Use an OpenBao token, AppRole, or Kubernetes Auth role whose ACL policy is
+limited to the corresponding OpenBao namespace. The operator does not create
+or manage OpenBao namespaces.
 
 ## Verify the installation
 

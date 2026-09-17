@@ -6,10 +6,16 @@ KUBE_CONTEXT=${KUBE_CONTEXT:-kind-openbao-entity-operator}
 OPENBAO_NAMESPACE=${OPENBAO_NAMESPACE:-openbao}
 OPENBAO_DEPLOYMENT=${OPENBAO_DEPLOYMENT:-openbao}
 TEST_NAMESPACE=${TEST_NAMESPACE:-openbao-entity-operator-e2e}
+OUTSIDE_NAMESPACE=${OUTSIDE_NAMESPACE:-openbao-entity-operator-outside}
 OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-openbao-entity-operator-system}
 operator_deployment=${OPERATOR_DEPLOYMENT:-openbao-entity-operator}
 KEEP_TEST_RESOURCES=${KEEP_TEST_RESOURCES:-false}
 cleanup_script=${CLEANUP_SCRIPT:-hack/cleanup-kind-e2e.sh}
+
+if [[ "${OUTSIDE_NAMESPACE}" == "${TEST_NAMESPACE}" ]]; then
+  echo "OUTSIDE_NAMESPACE must differ from TEST_NAMESPACE" >&2
+  exit 1
+fi
 
 kubectl_cmd() {
   "${KUBECTL}" --context="${KUBE_CONTEXT}" "$@"
@@ -21,7 +27,7 @@ cleanup() {
     echo "Keeping ${TEST_NAMESPACE} for inspection (exit ${exit_code})" >&2
     exit "${exit_code}"
   fi
-  if ! KUBECTL="${KUBECTL}" KUBE_CONTEXT="${KUBE_CONTEXT}" TEST_NAMESPACE="${TEST_NAMESPACE}" "${cleanup_script}"; then
+  if ! KUBECTL="${KUBECTL}" KUBE_CONTEXT="${KUBE_CONTEXT}" TEST_NAMESPACE="${TEST_NAMESPACE}" OUTSIDE_NAMESPACE="${OUTSIDE_NAMESPACE}" "${cleanup_script}"; then
     echo "Failed to clean up ${TEST_NAMESPACE}; run make kind-e2e-clean to retry" >&2
     exit 1
   fi
@@ -215,11 +221,38 @@ kubectl_cmd -n "${OPERATOR_NAMESPACE}" wait --for=condition=available \
 for crd in openbaoconnections openbaopolicies openbaoentities openbaoentityaliases openbaogroups openbaogroupmemberships; do
   kubectl_cmd get crd "${crd}.openbao.openbao-operator.io" >/dev/null
 done
+kubectl_cmd -n "${TEST_NAMESPACE}" get rolebinding "${operator_deployment}-manager" >/dev/null
+if kubectl_cmd get clusterrolebinding "${operator_deployment}-manager" >/dev/null 2>&1; then
+  echo "scoped installation unexpectedly created a manager ClusterRoleBinding" >&2
+  exit 1
+fi
 
 reset_remote_test_objects
 configure_kubernetes_auth
 kubectl_cmd create namespace "${TEST_NAMESPACE}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
+kubectl_cmd create namespace "${OUTSIDE_NAMESPACE}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
 configure_approle_auth
+
+kubectl_cmd -n "${OUTSIDE_NAMESPACE}" delete openbaoconnection outside-scope --ignore-not-found=true >/dev/null
+cat <<EOF | kubectl_cmd -n "${OUTSIDE_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoConnection
+metadata:
+  name: outside-scope
+spec:
+  address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
+  kubernetesAuth:
+    mountPath: kubernetes
+    role: e2e-operator
+EOF
+for _ in {1..20}; do
+  if [[ -n "$(kubectl_cmd -n "${OUTSIDE_NAMESPACE}" get openbaoconnection/outside-scope -o 'jsonpath={.status.conditions[0].type}' 2>/dev/null || true)" ]]; then
+    echo "operator reconciled a resource outside its watch namespace allowlist" >&2
+    kubectl_cmd -n "${OUTSIDE_NAMESPACE}" get openbaoconnection/outside-scope -o yaml >&2 || true
+    exit 1
+  fi
+  sleep 1
+done
 
 cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1

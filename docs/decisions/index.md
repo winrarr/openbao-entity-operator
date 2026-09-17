@@ -6,3 +6,4 @@
 - [0004 — Make Helm the configurable installation surface](0004-helm-installation-surface.md)
 - [0005 — Keep live E2E coverage narrow](0005-test-pyramid.md)
 - [0006 — Use typed AppRole authentication with external credential rotation](0006-approle-auth.md)
+- [0007 — Enforce tenant boundaries at the Kubernetes and OpenBao layers](0007-tenant-boundary-enforcement.md)

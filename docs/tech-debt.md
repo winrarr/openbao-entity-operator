@@ -12,11 +12,20 @@ Exit criteria: add a separately provisioned integration environment that exercis
 
 ## TD-002: The shared manager has cluster-wide Secret access
 
-Status: accepted limitation
+Status: partially addressed
 
-The manager watches namespaced resources cluster-wide and its generated ClusterRole can read Secrets in every namespace. Same-namespace references constrain the API model, but they do not provide tenant isolation between mutually untrusted users.
+The default manager watches namespaced resources cluster-wide and its generated
+ClusterRole can read Secrets in every namespace. Helm installations can now set
+`watchNamespaces`, which scopes the cache and replaces the manager
+ClusterRoleBinding with namespace RoleBindings. Same-namespace references and
+this deployment scope still do not provide complete tenant isolation between
+mutually untrusted users.
 
-Exit criteria: add an independently scoped manager deployment and verify its cache, watch, and Secret permissions, or explicitly retain the trusted-platform deployment boundary as a product decision. The product outcome is tracked in [BL-001](backlog.md#bl-001-add-explicit-tenant-boundary-controls); see the [multi-tenancy guide](reference/multi-tenancy.md).
+Exit criteria: decide whether a fixed operator-owned connection or a first-class
+OpenBao domain resource is needed for shared installations, then verify the
+connection and authoring boundary if it is. The product outcome is tracked in
+[BL-001](backlog.md#bl-001-add-explicit-tenant-boundary-controls); see the
+[multi-tenancy guide](reference/multi-tenancy.md).
 
 ## TD-003: OpenBao API compatibility is snapshot-based
 

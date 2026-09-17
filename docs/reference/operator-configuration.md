@@ -25,6 +25,28 @@ when all connections use static token Secrets or AppRole.
 The chart does not configure OpenBao auth methods or roles. Those must be
 prepared by an OpenBao administrator.
 
+## Kubernetes watch scope
+
+`watchNamespaces` is an optional list of Kubernetes namespaces. When it is
+empty, the manager watches all namespaces for compatibility with the default
+trusted-platform installation. When it contains one or more namespaces, the
+manager cache watches only those namespaces and the chart binds the manager
+permissions with a `RoleBinding` in each listed namespace instead of using the
+manager `ClusterRoleBinding`.
+
+```yaml
+watchNamespaces:
+  - team-a
+  - team-b
+```
+
+This setting is intended for separate operator installations or other
+platform-controlled scopes. It does not decide which users may submit
+`OpenBaoConnection` resources, which resource kinds they may use, or which
+OpenBao namespace a credential can access. Use Kubernetes RBAC or admission
+policy for those authoring rules, and use an OpenBao namespace with a
+least-privilege policy for the external API boundary.
+
 ## Metrics
 
 Secure metrics are enabled by default. The chart creates the controller-runtime

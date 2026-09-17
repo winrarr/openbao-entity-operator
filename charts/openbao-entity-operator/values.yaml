@@ -14,6 +14,10 @@ leaderElection: true
 enableHTTP2: false
 healthProbeBindAddress: ":8081"
 
+# Empty watches every namespace. When set, the chart binds the manager
+# ClusterRole only in these namespaces and configures the cache to watch them.
+watchNamespaces: []
+
 metrics:
   enabled: true
   secure: true

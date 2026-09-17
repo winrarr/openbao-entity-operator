@@ -17,6 +17,14 @@ Kubernetes API
 
 The API types and Kubebuilder markers under `api/openbao/v1alpha1` are authoritative. CRDs and deepcopy methods are derived with `make manifests generate`. The OpenAPI file under `hack/` is external reference material only.
 
+The manager's optional `--watch-namespaces` setting is translated into
+controller-runtime `DefaultNamespaces` cache configuration. The Helm chart
+matches that runtime scope with namespace RoleBindings; an empty setting keeps
+the existing cluster-wide manager ClusterRoleBinding. This controls Kubernetes
+reads and watches only. The OpenBao client applies
+`OpenBaoConnection.spec.namespace`, and the connection's ACL policy remains the
+external authorization boundary.
+
 ## Connection flow
 
 `OpenBaoConnectionReconciler` constructs a client with the configured authentication method, optional CA bundle, and OpenBao namespace. Token-authenticated connections read a same-namespace Secret and validate it with `/v1/auth/token/lookup-self`. Kubernetes-authenticated connections read the projected ServiceAccount JWT and log in through `/v1/auth/<mount>/login`; AppRole connections read same-namespace role ID and Secret ID sources and use the same login route shape. A manager-wide connection cache retains dynamic-auth clients so renewable leases can be renewed across reconciliations, and the client performs one fresh login retry after an authentication failure. Root connections also call `/v1/sys/health`; health statuses such as sealed, standby, and uninitialized are decoded even when OpenBao reports them with non-2xx HTTP codes. OpenBao restricts `/sys/health` in child namespaces, so namespace-scoped connections establish readiness through namespaced token self-lookup. Tokens, JWTs, and AppRole credentials are never copied into status or log fields.
