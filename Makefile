@@ -30,6 +30,7 @@ OPENBAO_TOKEN_SECRET ?= openbao-dev-token
 OPENBAO_TOKEN_KEY ?= token
 OPERATOR_NAMESPACE ?= openbao-entity-operator-system
 E2E_TEST_NAMESPACE ?= openbao-entity-operator-e2e
+E2E_TENANT_B_NAMESPACE ?= openbao-entity-operator-e2e-b
 E2E_OUTSIDE_NAMESPACE ?= openbao-entity-operator-outside
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
@@ -333,20 +334,25 @@ kind-deploy: ## Build and deploy the operator into Kind.
 .PHONY: kind-deploy-e2e
 kind-deploy-e2e: kind-deploy ## Build and deploy the operator for live E2E tests.
 	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" create namespace "$(E2E_TEST_NAMESPACE)" --dry-run=client -o yaml | $(KUBECTL) --context="kind-$(KIND_CLUSTER)" apply -f -
-	$(MAKE) HELM_INSTALL_ARGS="--set-string watchNamespaces[0]=$(E2E_TEST_NAMESPACE)" KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" helm-install
+	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" create namespace "$(E2E_TENANT_B_NAMESPACE)" --dry-run=client -o yaml | $(KUBECTL) --context="kind-$(KIND_CLUSTER)" apply -f -
+	$(MAKE) HELM_INSTALL_ARGS="--set-string watchNamespaces[0]=$(E2E_TEST_NAMESPACE) --set-string watchNamespaces[1]=$(E2E_TENANT_B_NAMESPACE)" KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" helm-install
 
 .PHONY: kind-e2e
 kind-e2e: ## Run the live OpenBao reconciliation workflow in Kind.
 	$(MAKE) kind-deploy-e2e
-	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" OUTSIDE_NAMESPACE="$(E2E_OUTSIDE_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
+	KEEP_TEST_RESOURCES=true KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" TENANT_B_NAMESPACE="$(E2E_TENANT_B_NAMESPACE)" OUTSIDE_NAMESPACE="$(E2E_OUTSIDE_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
 		OPENBAO_TOKEN_SECRET="$(OPENBAO_TOKEN_SECRET)" OPENBAO_TOKEN_KEY="$(OPENBAO_TOKEN_KEY)" OPERATOR_NAMESPACE="$(OPERATOR_NAMESPACE)" \
 		OPERATOR_DEPLOYMENT="$(PROJECT_NAME)" \
 		./hack/e2e-kind.sh
+	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" TENANT_B_NAMESPACE="$(E2E_TENANT_B_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
+		OPERATOR_NAMESPACE="$(OPERATOR_NAMESPACE)" OPERATOR_DEPLOYMENT="$(PROJECT_NAME)" \
+		./hack/e2e-multi-tenancy.sh
+	$(MAKE) KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" kind-e2e-clean
 	$(MAKE) HELM_INSTALL_ARGS="" KUBECTL_ARGS="--context=kind-$(KIND_CLUSTER)" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" helm-install
 
 .PHONY: kind-e2e-clean
 kind-e2e-clean: kind ## Remove only the failed live E2E test resources.
-	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" OUTSIDE_NAMESPACE="$(E2E_OUTSIDE_NAMESPACE)" ./hack/cleanup-kind-e2e.sh
+	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" TENANT_B_NAMESPACE="$(E2E_TENANT_B_NAMESPACE)" OUTSIDE_NAMESPACE="$(E2E_OUTSIDE_NAMESPACE)" ./hack/cleanup-kind-e2e.sh
 
 .PHONY: kind-refresh
 kind-refresh: ## Rebuild and redeploy the operator in Kind.

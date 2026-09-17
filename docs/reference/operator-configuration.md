@@ -47,6 +47,27 @@ OpenBao namespace a credential can access. Use Kubernetes RBAC or admission
 policy for those authoring rules, and use an OpenBao namespace with a
 least-privilege policy for the external API boundary.
 
+The chart also publishes an unbound `ClusterRole` named
+`<release-name>-tenant-author-role`. Bind it with a namespace `RoleBinding` to
+each tenant ServiceAccount that should author resources. It grants CRUD access
+to policies, entities, aliases, groups, and group memberships only; it omits
+connections, connection status/finalizers, and Secrets. Keep the platform-owned
+connection and any static credential Secret outside the tenant's authoring
+permissions. Kubernetes Auth is preferred because it avoids a static
+connection credential Secret altogether.
+
+Example:
+
+```sh
+kubectl -n team-a create rolebinding team-a-openbao-author \
+  --clusterrole=openbao-entity-operator-tenant-author-role \
+  --serviceaccount=team-a:team-a-operator
+```
+
+This role is a permission profile, not an admission policy. Use platform RBAC
+or admission policy to control tenant naming, deletion policies, and which
+ServiceAccounts receive it.
+
 ## Metrics
 
 Secure metrics are enabled by default. The chart creates the controller-runtime

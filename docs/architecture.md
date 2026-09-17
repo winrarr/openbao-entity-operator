@@ -25,6 +25,14 @@ reads and watches only. The OpenBao client applies
 `OpenBaoConnection.spec.namespace`, and the connection's ACL policy remains the
 external authorization boundary.
 
+The chart publishes two distinct RBAC surfaces. The manager permissions are
+needed by reconcilers and should be bound only to the operator ServiceAccount.
+The unbound tenant-author ClusterRole is a platform authoring profile for
+tenant ServiceAccounts; it excludes connections, connection subresources,
+Secrets, and manager finalizers. A platform-owned connection therefore remains
+outside tenant mutation permissions while same-namespace references let tenant
+resources use the connection by name.
+
 ## Connection flow
 
 `OpenBaoConnectionReconciler` constructs a client with the configured authentication method, optional CA bundle, and OpenBao namespace. Token-authenticated connections read a same-namespace Secret and validate it with `/v1/auth/token/lookup-self`. Kubernetes-authenticated connections read the projected ServiceAccount JWT and log in through `/v1/auth/<mount>/login`; AppRole connections read same-namespace role ID and Secret ID sources and use the same login route shape. A manager-wide connection cache retains dynamic-auth clients so renewable leases can be renewed across reconciliations, and the client performs one fresh login retry after an authentication failure. Root connections also call `/v1/sys/health`; health statuses such as sealed, standby, and uninitialized are decoded even when OpenBao reports them with non-2xx HTTP codes. OpenBao restricts `/sys/health` in child namespaces, so namespace-scoped connections establish readiness through namespaced token self-lookup. Tokens, JWTs, and AppRole credentials are never copied into status or log fields.

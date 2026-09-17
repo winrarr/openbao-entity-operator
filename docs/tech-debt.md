@@ -12,19 +12,21 @@ Exit criteria: add a separately provisioned integration environment that exercis
 
 ## TD-002: The shared manager has cluster-wide Secret access
 
-Status: partially addressed
+Status: partially addressed; scoped model covered
 
 The default manager watches namespaced resources cluster-wide and its generated
 ClusterRole can read Secrets in every namespace. Helm installations can now set
 `watchNamespaces`, which scopes the cache and replaces the manager
-ClusterRoleBinding with namespace RoleBindings. Same-namespace references and
-this deployment scope still do not provide complete tenant isolation between
-mutually untrusted users.
+ClusterRoleBinding with namespace RoleBindings. The chart also provides an
+unbound tenant-author ClusterRole that omits connections and Secrets; the
+platform must bind it instead of the generated CRD editor/admin roles. This
+scoped model still does not provide complete tenant isolation if a platform
+grants tenants broader Kubernetes RBAC or uses a shared root OpenBao credential.
 
-Exit criteria: decide whether a fixed operator-owned connection or a first-class
-OpenBao domain resource is needed for shared installations, then verify the
-connection and authoring boundary if it is. The product outcome is tracked in
-[BL-001](backlog.md#bl-001-add-explicit-tenant-boundary-controls); see the
+Exit criteria: keep the documented scoped, platform-owned model covered by the
+Kind isolation scenario; add a fixed connection or first-class domain resource
+only if a concrete shared-installation use case requires controller-enforced
+connection selection. See the
 [multi-tenancy guide](reference/multi-tenancy.md).
 
 ## TD-003: OpenBao API compatibility is snapshot-based

@@ -133,3 +133,27 @@ rules:
   - openbaoentities/status
   verbs:
   - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openbao-entity-operator.fullname" . }}-tenant-author-role
+  labels:
+{{ include "openbao-entity-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - openbao.openbao-operator.io
+  resources:
+  - openbaoentities
+  - openbaoentityaliases
+  - openbaogroups
+  - openbaogroupmemberships
+  - openbaopolicies
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
