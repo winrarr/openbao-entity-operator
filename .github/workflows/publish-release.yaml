@@ -56,60 +56,9 @@ jobs:
           RELEASE_TAG: ${{ env.RELEASE_TAG }}
         run: |
           set -euo pipefail
-
-          semver_re='^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$'
-          chart_yaml='charts/openbao-entity-operator/Chart.yaml'
-          chart_version="$(awk '$1 == "version:" { value=$2; gsub(/^"/, "", value); gsub(/"$/, "", value); print value; exit }' "$chart_yaml")"
-          app_version="$(awk '$1 == "appVersion:" { value=$2; gsub(/^"/, "", value); gsub(/"$/, "", value); print value; exit }' "$chart_yaml")"
-
-          if [[ ! "$chart_version" =~ $semver_re ]]; then
-            echo "Chart.yaml version must use X.Y.Z or X.Y.Z-rc.N, got: $chart_version" >&2
-            exit 1
-          fi
-          if [[ ! "$app_version" =~ $semver_re ]]; then
-            echo "Chart.yaml appVersion must use X.Y.Z or X.Y.Z-rc.N, got: $app_version" >&2
-            exit 1
-          fi
-
-          case "$RELEASE_TAG" in
-            v*)
-              operator_version="${RELEASE_TAG#v}"
-              if [[ "$chart_version" != "$operator_version" || "$app_version" != "$operator_version" ]]; then
-                echo "Paired release tag $RELEASE_TAG requires matching Chart.yaml version and appVersion" >&2
-                exit 1
-              fi
-              release_kind=operator
-              make_latest=true
-              ;;
-            chart-v*)
-              chart_tag_version="${RELEASE_TAG#chart-v}"
-              if [[ "$chart_version" != "$chart_tag_version" ]]; then
-                echo "Chart.yaml version $chart_version does not match chart tag $RELEASE_TAG" >&2
-                exit 1
-              fi
-              operator_version="$app_version"
-              release_kind=chart
-              make_latest=false
-              ;;
-            *)
-              echo "Release tag must start with v or chart-v: $RELEASE_TAG" >&2
-              exit 1
-              ;;
-          esac
-
-          prerelease=false
-          if [[ "$RELEASE_TAG" == *-rc.* ]]; then
-            prerelease=true
-            make_latest=false
-          fi
-
-          {
-            echo "release_kind=$release_kind"
-            echo "chart_version=$chart_version"
-            echo "operator_version=$operator_version"
-            echo "prerelease=$prerelease"
-            echo "make_latest=$make_latest"
-          } >> "$GITHUB_OUTPUT"
+          while IFS='=' read -r key value; do
+            echo "$key=$value" >> "$GITHUB_OUTPUT"
+          done < <(RELEASE_TAG="$RELEASE_TAG" ./hack/validate-release.sh)
 
       - name: Check generated and rendered artifacts
         run: make verify-generated helm-template
