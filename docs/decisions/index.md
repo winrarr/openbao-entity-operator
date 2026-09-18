@@ -9,3 +9,4 @@
 - [0007 — Enforce tenant boundaries at the Kubernetes and OpenBao layers](0007-tenant-boundary-enforcement.md)
 - [0008 — Retain deletion finalizers when cleanup access is unavailable](0008-deletion-finalizer-retention.md)
 - [0009 — Use a disposable persistent TLS fixture for operator resilience](0009-operator-resilience-fixture.md)
+- [0010 — Manage Kubernetes Auth roles without managing the auth mount](0010-kubernetes-auth-role-boundary.md)

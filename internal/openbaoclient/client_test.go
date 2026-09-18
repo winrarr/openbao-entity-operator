@@ -37,6 +37,7 @@ const (
 	clientGroupID         = "group-1"
 	clientGroupName       = "platform"
 	clientPolicyName      = "payments"
+	clientDefaultPolicy   = "default"
 	clientPolicyRules     = "path \"identity/*\" { capabilities = [\"read\"] }"
 	testAuthRole          = "operator"
 	testJWT               = "jwt-1"
@@ -78,7 +79,7 @@ func TestEntityClientUsesOpenBaoHeadersAndPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if entity.ID != clientEntityID || entity.Name != "payments" {
+	if entity.ID != clientEntityID || entity.Name != clientPolicyName {
 		t.Fatalf("entity = %#v, want entity-1/payments", entity)
 	}
 	if got, want := requests, []string{"GET /v1/identity/entity/name/payments"}; fmt.Sprint(got) != fmt.Sprint(want) {
@@ -520,7 +521,7 @@ func TestGroupClientUsesOpenBaoGroupEndpoints(t *testing.T) {
 		t.Fatalf("group = %#v, want group-1 with entity-1", group)
 	}
 	if _, err := apiClient.CreateGroup(context.Background(), GroupRequest{
-		Name: clientGroupName, Type: "internal", Policies: []string{"default"}, MemberEntityIDs: []string{"entity-1"}, MemberGroupIDs: []string{},
+		Name: clientGroupName, Type: "internal", Policies: []string{clientDefaultPolicy}, MemberEntityIDs: []string{"entity-1"}, MemberGroupIDs: []string{},
 	}); err != nil {
 		t.Fatal(err)
 	}

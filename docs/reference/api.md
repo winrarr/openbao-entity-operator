@@ -14,6 +14,7 @@ Package v1alpha1 contains API Schema definitions for the openbao v1alpha1 API gr
 - [OpenBaoEntityAlias](#openbaoentityalias)
 - [OpenBaoGroup](#openbaogroup)
 - [OpenBaoGroupMembership](#openbaogroupmembership)
+- [OpenBaoKubernetesAuthRole](#openbaokubernetesauthrole)
 - [OpenBaoPolicy](#openbaopolicy)
 
 
@@ -49,6 +50,7 @@ _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 - [OpenBaoGroupSpec](#openbaogroupspec)
+- [OpenBaoKubernetesAuthRoleSpec](#openbaokubernetesauthrolespec)
 - [OpenBaoPolicySpec](#openbaopolicyspec)
 
 | Field | Description |
@@ -70,6 +72,7 @@ _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 - [OpenBaoGroupSpec](#openbaogroupspec)
+- [OpenBaoKubernetesAuthRoleSpec](#openbaokubernetesauthrolespec)
 - [OpenBaoPolicySpec](#openbaopolicyspec)
 
 | Field | Description |
@@ -127,6 +130,7 @@ _Appears in:_
 - [OpenBaoEntityAliasSpec](#openbaoentityaliasspec)
 - [OpenBaoEntitySpec](#openbaoentityspec)
 - [OpenBaoGroupSpec](#openbaogroupspec)
+- [OpenBaoKubernetesAuthRoleSpec](#openbaokubernetesauthrolespec)
 - [OpenBaoPolicySpec](#openbaopolicyspec)
 
 | Field | Description | Default | Validation |
@@ -360,6 +364,51 @@ _Appears in:_
 | --- | --- |
 | `Internal` |  |
 | `External` |  |
+
+
+#### OpenBaoKubernetesAuthRole
+
+
+
+OpenBaoKubernetesAuthRole is the Schema for the openbaokubernetesauthroles API.
+
+
+
+
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `apiVersion` _string_ | `openbao.openbao-operator.io/v1alpha1` | | |
+| `kind` _string_ | `OpenBaoKubernetesAuthRole` | | |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  | Optional: \{\} <br /> |
+| `spec` _[OpenBaoKubernetesAuthRoleSpec](#openbaokubernetesauthrolespec)_ | spec defines the desired state of OpenBaoKubernetesAuthRole |  | Required: \{\} <br /> |
+
+
+#### OpenBaoKubernetesAuthRoleSpec
+
+
+
+OpenBaoKubernetesAuthRoleSpec defines the desired state of a role in an
+OpenBao Kubernetes Auth mount.
+
+
+
+_Appears in:_
+- [OpenBaoKubernetesAuthRole](#openbaokubernetesauthrole)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `connectionRef` _[OpenBaoConnectionReference](#openbaoconnectionreference)_ | ConnectionRef selects the OpenBao API connection in the same namespace. |  |  |
+| `mountPath` _string_ | MountPath is the OpenBao Kubernetes Auth mount path without the leading<br />auth/ prefix. The mount must already be enabled and configured. | kubernetes | Pattern: `^[^/[:space:]]+([/][^/[:space:]]+)*$` <br /> |
+| `creationPolicy` _[CreationPolicy](#creationpolicy)_ | CreationPolicy controls how an external role is acquired. | Create | Enum: [Create Adopt CreateOrAdopt] <br />Optional: \{\} <br /> |
+| `deletionPolicy` _[DeletionPolicy](#deletionpolicy)_ | DeletionPolicy controls whether the external role is deleted with this resource. | Orphan | Enum: [Delete Orphan] <br />Optional: \{\} <br /> |
+| `driftDetectionInterval` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | DriftDetectionInterval controls periodic checks for changes made outside Kubernetes.<br />A zero duration disables periodic checks. When omitted, the operator default is used. |  | Optional: \{\} <br /> |
+| `boundServiceAccountNames` _string array_ | BoundServiceAccountNames lists the Kubernetes ServiceAccounts allowed to use the role.<br />OpenBao also accepts * as a wildcard; use it only when the connection's OpenBao<br />policy deliberately permits that boundary. |  | MinItems: 1 <br /> |
+| `boundServiceAccountNamespaces` _string array_ | BoundServiceAccountNamespaces lists the Kubernetes namespaces allowed to use the role.<br />OpenBao also accepts * as a wildcard; use it only when the connection's OpenBao<br />policy deliberately permits that boundary. |  | MinItems: 1 <br /> |
+| `tokenPolicies` _string array_ | TokenPolicies is the set of OpenBao ACL policies attached to tokens issued by the role. |  | Optional: \{\} <br /> |
+| `tokenTTL` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | TokenTTL is the initial token lifetime. A zero or omitted value uses OpenBao's default. |  | Optional: \{\} <br /> |
+| `tokenMaxTTL` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | TokenMaxTTL is the maximum token lifetime. A zero or omitted value uses OpenBao's default. |  | Optional: \{\} <br /> |
+| `tokenPeriod` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#duration-v1-meta)_ | TokenPeriod gives issued tokens a fixed renewable period. A zero or omitted value disables it. |  | Optional: \{\} <br /> |
 
 
 #### OpenBaoPolicy

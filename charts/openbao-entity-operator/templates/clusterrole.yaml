@@ -20,6 +20,7 @@ rules:
   - openbaoentities
   - openbaoentityaliases
   - openbaogroups
+  - openbaokubernetesauthroles
   - openbaopolicies
   verbs:
   - create
@@ -36,6 +37,7 @@ rules:
   - openbaoentities/finalizers
   - openbaoentityaliases/finalizers
   - openbaogroups/finalizers
+  - openbaokubernetesauthroles/finalizers
   - openbaopolicies/finalizers
   verbs:
   - update
@@ -47,6 +49,7 @@ rules:
   - openbaoentityaliases/status
   - openbaogroupmemberships/status
   - openbaogroups/status
+  - openbaokubernetesauthroles/status
   - openbaopolicies/status
   verbs:
   - get

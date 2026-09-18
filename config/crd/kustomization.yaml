@@ -8,6 +8,7 @@ resources:
 - bases/openbao.openbao-operator.io_openbaogroups.yaml
 - bases/openbao.openbao-operator.io_openbaogroupmemberships.yaml
 - bases/openbao.openbao-operator.io_openbaopolicies.yaml
+- bases/openbao.openbao-operator.io_openbaokubernetesauthroles.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
