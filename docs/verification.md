@@ -8,9 +8,9 @@
 | `make shell-check` | Repository shell scripts parse successfully | Does not assess shell behavior against a cluster |
 | `make manifests generate` | CRDs, RBAC, and deepcopy output can be regenerated | Does not prove generated output was committed |
 | `make verify-generated` | Tracked generated output has no regeneration diff | Requires a Git checkout and compares only the protected paths |
-| `make test` | Client HTTP behavior, Kubernetes Auth and AppRole login/renew/re-login, policy and Kubernetes Auth role lifecycle, and identity reconciliation transitions pass unit tests | Does not exercise a live Kubernetes API server or OpenBao |
+| `make test` | Typed OpenBao HTTP contracts, authentication login/renew/re-login, policy and role lifecycle, system-resource lifecycle, and identity reconciliation transitions pass unit tests | Does not exercise a live Kubernetes API server or OpenBao |
 | `make lint-config lint` | Linter configuration and source checks pass | Linter findings are not a substitute for runtime tests |
-| `make openapi-check` | The checked-in OpenBao reference is valid and contains the entity, alias, group, and ACL policy endpoints used here | The reference is version-specific and dynamic |
+| `make openapi-check` | The checked-in OpenBao reference is valid and contains the selected durable OpenBao API families used here | The reference is version-specific and dynamic |
 | `make kustomize-build` | The default installation manifests render | Does not apply them to a cluster |
 | `make helm-lint helm-template` | The Helm chart values validate and the chart renders | Does not install the chart |
 | `make helm-package` | Packages the validated Helm chart, including committed CRDs, into `dist/` | Does not publish the package |

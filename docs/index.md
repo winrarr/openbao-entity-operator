@@ -1,9 +1,9 @@
 # OpenBao Entity Operator
 
-OpenBao Entity Operator manages OpenBao ACL policies and identity resources
-through Kubernetes custom resources. This site explains how to install the
-operator, connect it to OpenBao, declare resources, and operate the resulting
-reconciliation loops.
+OpenBao Entity Operator manages OpenBao entities and durable API configuration
+through Kubernetes custom resources. OpenBao is deployed separately; this site
+explains how to install the operator, connect it to OpenBao, declare resources,
+and operate the resulting reconciliation loops.
 
 ## Start here
 

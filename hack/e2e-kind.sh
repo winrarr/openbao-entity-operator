@@ -101,7 +101,8 @@ remote_group() {
 reset_remote_test_objects() {
   local alias_id alias_name group_id group_name name
 
-  openbao_cli delete auth/approle/role/e2e-approle >/dev/null 2>&1 || true
+	openbao_cli delete auth/approle/role/e2e-approle >/dev/null 2>&1 || true
+	openbao_cli delete sys/loggers/audit >/dev/null 2>&1 || true
 
   while IFS= read -r alias_id; do
     [[ -n "${alias_id}" ]] || continue
@@ -131,6 +132,7 @@ reset_remote_test_objects() {
   done
 
   openbao_cli delete auth/kubernetes/role/e2e-managed-role >/dev/null 2>&1 || true
+  openbao_cli delete sys/mounts/e2e-kv >/dev/null 2>&1 || true
 
   for name in e2e-policy e2e-policy-conflict e2e-policy-adopt e2e-policy-orphan e2e-policy-delete; do
     openbao_cli delete "sys/policies/acl/${name}" >/dev/null 2>&1 || true
@@ -199,6 +201,22 @@ path "auth/kubernetes/role" {
 path "auth/kubernetes/role/*" {
   capabilities = ["create", "read", "update", "delete", "list"]
 }
+
+path "sys/mounts" {
+  capabilities = ["read", "list"]
+}
+
+path "sys/mounts/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "sys/loggers" {
+  capabilities = ["read", "update", "delete"]
+}
+
+path "sys/loggers/*" {
+  capabilities = ["read", "update", "delete"]
+}
 EOF
 
   openbao_cli write auth/kubernetes/role/e2e-operator \
@@ -241,7 +259,7 @@ kubectl_cmd -n "${OPENBAO_NAMESPACE}" wait --for=condition=available \
 kubectl_cmd -n "${OPERATOR_NAMESPACE}" wait --for=condition=available \
   "deployment/${operator_deployment}" --timeout=5m >/dev/null
 
-for crd in openbaoconnections openbaopolicies openbaokubernetesauthroles openbaoentities openbaoentityaliases openbaogroups openbaogroupmemberships; do
+for crd in openbaoconnections openbaopolicies openbaokubernetesauthroles openbaoentities openbaoentityaliases openbaogroups openbaogroupmemberships openbaosecretengines openbaoapproles openbaoauditdevices openbaoauditrequestheaders openbaoauthmethods openbaocorsconfigurations openbaoencryptionkeyconfigurations openbaogroupaliases openbaokeyringrotationconfigurations openbaologgers openbaomfaloginenforcements openbaomfamethods openbaonamespaces openbaooidcassignments openbaooidcclients openbaooidcconfigs openbaooidckeys openbaooidcproviders openbaooidcroles openbaooidcscopes openbaopasswordpolicies openbaopersonas openbaoplugins openbaoratelimitquotaconfigurations openbaoratelimitquotas openbaotokenroles openbaouiheaders openbaoworkflows; do
   kubectl_cmd get crd "${crd}.openbao.openbao-operator.io" >/dev/null
 done
 kubectl_cmd -n "${TEST_NAMESPACE}" get rolebinding "${operator_deployment}-manager" >/dev/null
@@ -290,6 +308,47 @@ spec:
     role: e2e-operator
 EOF
 wait_ready openbaoconnection/openbao
+
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoSecretEngine
+metadata:
+  name: e2e-kv
+spec:
+  connectionRef:
+    name: openbao
+  path: e2e-kv
+  type: kv
+  options:
+    version: "2"
+  deletionPolicy: Delete
+EOF
+wait_ready openbaosecretengine/e2e-kv
+openbao_cli read -format=json sys/mounts/e2e-kv | jq -e \
+  '.data.type == "kv" and .data.options.version == "2"' >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaosecretengine/e2e-kv --wait=true --timeout=5m >/dev/null
+if openbao_cli read sys/mounts/e2e-kv >/dev/null 2>&1; then
+  echo "secret engine still exists in OpenBao after deletion" >&2
+  exit 1
+fi
+
+cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoLogger
+metadata:
+  name: e2e-audit-logger
+spec:
+  connectionRef:
+    name: openbao
+  name: audit
+  level: debug
+  creationPolicy: Adopt
+  deletionPolicy: Delete
+EOF
+wait_ready openbaologger/e2e-audit-logger
+kubectl_cmd -n "${TEST_NAMESPACE}" get openbaologger/e2e-audit-logger -o jsonpath='{.status.level}' | grep -qx debug
+openbao_cli read -format=json sys/loggers/audit | jq -e '.data.audit == "debug"' >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" delete openbaologger/e2e-audit-logger --wait=true --timeout=5m >/dev/null
 
 cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1

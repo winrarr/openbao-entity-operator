@@ -43,6 +43,8 @@ const (
 	authPathSegment         = "auth"
 	defaultKubernetesMount  = "kubernetes"
 	defaultAppRoleMount     = "approle"
+	listQueryKey            = "list"
+	trueQueryValue          = "true"
 	serviceAccountTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
 
@@ -102,10 +104,23 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("OpenBao API returned HTTP %d: %s", e.StatusCode, e.Body)
 }
 
-// IsNotFound reports whether err is an OpenBao 404 response.
+// IsNotFound reports whether err represents a missing OpenBao resource.
+//
+// OpenBao returns HTTP 400 for a missing auth method or secret-engine mount,
+// so status alone is not sufficient for mount reconciliation.
 func IsNotFound(err error) bool {
 	var httpErr *HTTPError
-	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
+	if !errors.As(err, &httpErr) {
+		return false
+	}
+	if httpErr.StatusCode == http.StatusNotFound {
+		return true
+	}
+	if httpErr.StatusCode != http.StatusBadRequest {
+		return false
+	}
+	body := strings.ToLower(httpErr.Body)
+	return strings.Contains(body, "no auth method mount at") || strings.Contains(body, "no secret engine mount at")
 }
 
 // IsUnauthorized reports whether err represents an authentication or
@@ -266,8 +281,8 @@ func validateNamespace(namespace string) error {
 		return errors.New("OpenBao namespace must not start or end with whitespace")
 	}
 	reserved := map[string]struct{}{
-		".": {}, "..": {}, "root": {}, "sys": {}, "audit": {},
-		"auth": {}, "cubbyhole": {}, "identity": {},
+		".": {}, "..": {}, "root": {}, "sys": {}, auditPathSegment: {},
+		"auth": {}, "cubbyhole": {}, identityPathSegment: {},
 	}
 	for segment := range strings.SplitSeq(namespace, "/") {
 		if segment == "" {

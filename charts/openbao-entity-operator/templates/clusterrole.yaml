@@ -16,12 +16,40 @@ rules:
 - apiGroups:
   - openbao.openbao-operator.io
   resources:
+  - openbaoapproles
+  - openbaoauditdevices
+  - openbaoauditrequestheaders
+  - openbaoauthmethods
   - openbaoconnections
+  - openbaocorsconfigurations
+  - openbaoencryptionkeyconfigurations
   - openbaoentities
   - openbaoentityaliases
+  - openbaogroupaliases
   - openbaogroups
+  - openbaokeyringrotationconfigurations
   - openbaokubernetesauthroles
+  - openbaologgers
+  - openbaomfaloginenforcements
+  - openbaomfamethods
+  - openbaonamespaces
+  - openbaooidcassignments
+  - openbaooidcclients
+  - openbaooidcconfigs
+  - openbaooidckeys
+  - openbaooidcproviders
+  - openbaooidcroles
+  - openbaooidcscopes
+  - openbaopasswordpolicies
+  - openbaopersonas
+  - openbaoplugins
   - openbaopolicies
+  - openbaoratelimitquotaconfigurations
+  - openbaoratelimitquotas
+  - openbaosecretengines
+  - openbaotokenroles
+  - openbaouiheaders
+  - openbaoworkflows
   verbs:
   - create
   - delete
@@ -33,24 +61,79 @@ rules:
 - apiGroups:
   - openbao.openbao-operator.io
   resources:
+  - openbaoapproles/finalizers
+  - openbaoauditdevices/finalizers
+  - openbaoauditrequestheaders/finalizers
+  - openbaoauthmethods/finalizers
   - openbaoconnections/finalizers
+  - openbaocorsconfigurations/finalizers
+  - openbaoencryptionkeyconfigurations/finalizers
   - openbaoentities/finalizers
   - openbaoentityaliases/finalizers
+  - openbaogroupaliases/finalizers
   - openbaogroups/finalizers
+  - openbaokeyringrotationconfigurations/finalizers
   - openbaokubernetesauthroles/finalizers
+  - openbaologgers/finalizers
+  - openbaomfaloginenforcements/finalizers
+  - openbaomfamethods/finalizers
+  - openbaonamespaces/finalizers
+  - openbaooidcassignments/finalizers
+  - openbaooidcclients/finalizers
+  - openbaooidckeys/finalizers
+  - openbaooidcproviders/finalizers
+  - openbaooidcroles/finalizers
+  - openbaooidcscopes/finalizers
+  - openbaopasswordpolicies/finalizers
+  - openbaopersonas/finalizers
+  - openbaoplugins/finalizers
   - openbaopolicies/finalizers
+  - openbaoratelimitquotaconfigurations/finalizers
+  - openbaoratelimitquotas/finalizers
+  - openbaosecretengines/finalizers
+  - openbaotokenroles/finalizers
+  - openbaouiheaders/finalizers
+  - openbaoworkflows/finalizers
   verbs:
   - update
 - apiGroups:
   - openbao.openbao-operator.io
   resources:
+  - openbaoapproles/status
+  - openbaoauditdevices/status
+  - openbaoauditrequestheaders/status
+  - openbaoauthmethods/status
   - openbaoconnections/status
+  - openbaocorsconfigurations/status
+  - openbaoencryptionkeyconfigurations/status
   - openbaoentities/status
   - openbaoentityaliases/status
+  - openbaogroupaliases/status
   - openbaogroupmemberships/status
   - openbaogroups/status
+  - openbaokeyringrotationconfigurations/status
   - openbaokubernetesauthroles/status
+  - openbaologgers/status
+  - openbaomfaloginenforcements/status
+  - openbaomfamethods/status
+  - openbaonamespaces/status
+  - openbaooidcassignments/status
+  - openbaooidcclients/status
+  - openbaooidcconfigs/status
+  - openbaooidckeys/status
+  - openbaooidcproviders/status
+  - openbaooidcroles/status
+  - openbaooidcscopes/status
+  - openbaopasswordpolicies/status
+  - openbaopersonas/status
+  - openbaoplugins/status
   - openbaopolicies/status
+  - openbaoratelimitquotaconfigurations/status
+  - openbaoratelimitquotas/status
+  - openbaosecretengines/status
+  - openbaotokenroles/status
+  - openbaouiheaders/status
+  - openbaoworkflows/status
   verbs:
   - get
   - patch

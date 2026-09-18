@@ -56,7 +56,7 @@ func (c *Client) ListEntityAliasIDs(ctx context.Context) ([]string, error) {
 	var response apiResponse[struct {
 		Keys []string `json:"keys"`
 	}]
-	if err := c.doSegmentsQuery(ctx, http.MethodGet, []string{identityPathSegment, entityAliasPathSegment, "id"}, url.Values{"list": {"true"}}, nil, &response); err != nil {
+	if err := c.doSegmentsQuery(ctx, http.MethodGet, []string{identityPathSegment, entityAliasPathSegment, "id"}, url.Values{listQueryKey: {trueQueryValue}}, nil, &response); err != nil {
 		return nil, err
 	}
 	return response.Data.Keys, nil

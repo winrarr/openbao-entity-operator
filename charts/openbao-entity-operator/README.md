@@ -26,10 +26,11 @@ metrics, matching the local Kustomize installation. Set `image.repository`,
 over the tag.
 
 The chart enables `serviceAccount.automountServiceAccountToken` by default so
-`OpenBaoConnection` resources can select OpenBao Kubernetes Auth. The selected
-OpenBao auth mount and role must be configured before the connection is created;
-the chart does not configure OpenBao auth methods. A connection using this mode
-does not need a static token Secret:
+`OpenBaoConnection` resources can select OpenBao Kubernetes Auth. The
+TokenReview credentials and bootstrap policy must be configured before the
+connection is created; durable auth mounts and roles can be managed by the
+operator after that connection is Ready. A connection using this mode does not
+need a static token Secret:
 
 ```yaml
 spec:
@@ -68,12 +69,11 @@ kubectl -n team-a create rolebinding team-a-openbao-author \
   --serviceaccount=team-a:team-a-operator
 ```
 
-The role grants CRUD access only to `OpenBaoPolicy`, `OpenBaoEntity`,
-`OpenBaoEntityAlias`, `OpenBaoGroup`, and `OpenBaoGroupMembership`. It does not
-grant access to `OpenBaoConnection` objects or Secrets. The platform must
-create and protect each connection and its credential material separately. The
-generated CRD admin/editor roles are intentionally broader and should not be
-bound to an untrusted tenant.
+The role grants CRUD access to the supported entity and durable configuration
+resources. It does not grant access to `OpenBaoConnection` objects or Secrets.
+The platform must create and protect each connection and its credential
+material separately. The generated CRD admin/editor roles are intentionally
+broader and should not be bound to an untrusted tenant.
 
 When secure metrics are enabled, the chart creates the authentication and
 authorization RBAC needed by controller-runtime. It creates a metrics reader

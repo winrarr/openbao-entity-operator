@@ -13,9 +13,11 @@ GitHub Container Registry.
   including the AppRole role ID and Secret ID, or a configured OpenBao
   Kubernetes Auth role when using Kubernetes Auth.
 
-The operator does not install OpenBao, enable auth methods, configure
-TokenReview credentials, or create OpenBao roles and policies for its own
-connection. Configure those prerequisites separately.
+The operator does not install OpenBao, initialize or unseal it, configure
+TokenReview credentials for Kubernetes Auth, or create credentials for its own
+connection. Configure connection-authentication prerequisites separately. Once
+the server and connection are available, durable auth methods, roles, policies,
+and secret-engine records can be managed through their CRDs.
 
 ## Install from OCI
 

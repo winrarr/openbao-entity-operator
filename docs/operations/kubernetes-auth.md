@@ -6,14 +6,14 @@ should not hold a long-lived OpenBao token Secret.
 
 ## OpenBao-side setup
 
-An OpenBao administrator must enable and configure the Kubernetes Auth method,
-including its Kubernetes API TokenReview credentials. The role used by the
-operator must be bound to the operator's Kubernetes ServiceAccount and
-namespace. Its policy should grant only the identity, policy, and role
-operations needed by the resources managed through that connection. The
-operator does not enable auth mounts or configure TokenReview credentials, but
-it can manage individual workload roles with `OpenBaoKubernetesAuthRole` when
-the connection policy allows it.
+An OpenBao administrator must configure the Kubernetes API TokenReview
+credentials and the policy used to bootstrap the operator connection. The role
+used by the operator must be bound to the operator's Kubernetes ServiceAccount
+and namespace. Its policy should grant only the operations needed by the
+resources managed through that connection. Once the connection is usable, the
+operator can enable the auth mount with `OpenBaoAuthMethod` and manage
+individual workload roles with `OpenBaoKubernetesAuthRole` when the connection
+policy allows it.
 
 The auth mount defaults to `kubernetes`. Set `spec.kubernetesAuth.mountPath`
 when OpenBao uses another mount path. The value is the mount path below `auth/`,

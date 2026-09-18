@@ -22,8 +22,11 @@ The chart enables `serviceAccount.automountServiceAccountToken` by default.
 Keep it enabled when any connection uses Kubernetes Auth. It may be disabled
 when all connections use static token Secrets or AppRole.
 
-The chart does not configure OpenBao auth methods or roles. Those must be
-prepared by an OpenBao administrator.
+The chart does not configure the authentication prerequisites used to connect
+to OpenBao, such as TokenReview credentials or bootstrap credentials. After the
+operator is installed and a connection is Ready, `OpenBaoAuthMethod` and the
+role resources can declaratively configure durable auth state when the
+connection's OpenBao ACL allows it.
 
 ## Kubernetes watch scope
 
@@ -50,7 +53,7 @@ least-privilege policy for the external API boundary.
 The chart also publishes an unbound `ClusterRole` named
 `<release-name>-tenant-author-role`. Bind it with a namespace `RoleBinding` to
 each tenant ServiceAccount that should author resources. It grants CRUD access
-to policies, entities, aliases, groups, and group memberships only; it omits
+to the supported entity and durable configuration resources; it omits
 connections, connection status/finalizers, and Secrets. Keep the platform-owned
 connection and any static credential Secret outside the tenant's authoring
 permissions. Kubernetes Auth is preferred because it avoids a static

@@ -2,7 +2,7 @@
 
 ## Orientation
 
-This is a Go 1.27 Kubernetes operator for OpenBao ACL policies, Kubernetes Auth roles, identity entities, and groups. The public API in `api/openbao/v1alpha1` is the source of truth for the namespaced `OpenBaoConnection`, `OpenBaoPolicy`, `OpenBaoKubernetesAuthRole`, `OpenBaoEntity`, `OpenBaoEntityAlias`, `OpenBaoGroup`, and `OpenBaoGroupMembership` CRDs.
+This is a Go 1.27 Kubernetes operator for durable entities and API configuration in an existing OpenBao instance. The public API in `api/openbao/v1alpha1` is the source of truth for all namespaced CRDs, including connection, policy, identity, authentication, OIDC, mount, namespace, audit, quota, workflow, and plugin resources.
 
 - `OpenBaoConnection` validates an OpenBao address and one supported authentication method (token Secret, Kubernetes Auth, or AppRole), then records health and authentication status.
 - `OpenBaoPolicy` reconciles a named OpenBao ACL policy document, including explicit creation/adoption, drift correction, and optional deletion.
@@ -11,6 +11,10 @@ This is a Go 1.27 Kubernetes operator for OpenBao ACL policies, Kubernetes Auth 
 - `OpenBaoEntityAlias` binds an auth-method mount accessor and alias name to a referenced entity, with explicit adoption and deletion policies.
 - `OpenBaoGroup` creates, adopts, updates, observes, and optionally deletes an OpenBao identity group.
 - `OpenBaoGroupMembership` claims one entity or subgroup relationship for an internal group. The group controller owns only claimed edges and preserves other remote memberships.
+- `OpenBaoGroupAlias`, `OpenBaoTokenRole`, `OpenBaoAppRole`, `OpenBaoPasswordPolicy`, `OpenBaoPersona`, and the MFA resources reconcile additional durable identity and authentication configuration.
+- `OpenBaoOIDCConfig`, `OpenBaoOIDCProvider`, `OpenBaoOIDCClient`, `OpenBaoOIDCKey`, `OpenBaoOIDCRole`, `OpenBaoOIDCScope`, and `OpenBaoOIDCAssignment` reconcile durable OIDC records without copying generated client secrets to Kubernetes.
+- `OpenBaoAuthMethod` and `OpenBaoSecretEngine` enable and tune mounts; `OpenBaoNamespace`, `OpenBaoAuditDevice`, `OpenBaoRateLimitQuota`, `OpenBaoWorkflow`, `OpenBaoPlugin`, and the system-configuration resources reconcile durable OpenBao system records.
+- The operator never deploys or owns the OpenBao server, storage, HA, initialization, unseal, upgrade, plugin artifact, arbitrary secret data, generated credentials, diagnostics, or one-shot administrative flows.
 - `internal/controller/openbao` contains reconciliation and dependency handling.
 - `internal/openbaoclient` contains the intentionally small typed HTTP client.
 - `config/` contains Kustomize installation and generated CRD/RBAC output.
@@ -23,10 +27,13 @@ This is a Go 1.27 Kubernetes operator for OpenBao ACL policies, Kubernetes Auth 
 - Do not edit `api/**/zz_generated.deepcopy.go`, `config/crd/bases/`, or `config/rbac/role.yaml`; regenerate them with `make manifests generate`.
 - `PROJECT` is Kubebuilder metadata. Change it only when the project layout or API inventory changes.
 - OpenBao credentials belong only in same-namespace Kubernetes Secrets. Never put tokens in status, logs, samples, fixtures, or documentation.
+- Generated credentials and secret material returned by OpenBao are not copied into Kubernetes. Resources that configure credential-issuing systems stop at the durable configuration endpoint.
 - Connection and external identity references are same-namespace and immutable for `OpenBaoEntity`, `OpenBaoEntityAlias`, and `OpenBaoGroup`; changing the target requires deleting and recreating the resource. Group membership references are also immutable and require exactly one entity or subgroup target.
 - `OpenBaoEntity` defaults to `creationPolicy: Create` and `deletionPolicy: Orphan`. External deletion is always opt-in.
 - `OpenBaoGroup` defaults to `creationPolicy: Create` and `deletionPolicy: Orphan`; `OpenBaoGroupMembership` never deletes a group or entity.
 - `OpenBaoKubernetesAuthRole` defaults to `creationPolicy: Create` and `deletionPolicy: Orphan`; its connection and mount path are immutable, and it never manages auth-mount enablement or TokenReview configuration.
+- Durable system resources default to `creationPolicy: Create` and `deletionPolicy: Orphan`; review blast radius before opting into external deletion.
+- OpenBao server deployment is a prerequisite and remains a separate platform-owned workload or managed service. Kind manifests are test fixtures, not operator-owned resources.
 - Preserve unrelated work in a dirty worktree. Generated files are derived output and should be reviewed for drift, not hand-edited.
 
 ## Canonical commands
