@@ -14,21 +14,22 @@ The target builds the operator image, installs the committed Helm chart, and the
 - uses Kind's default CNI unless `KIND_CNI=cilium` is supplied;
 - loads `openbao/openbao:2.6.2` and starts a single in-memory dev server;
 - generates a local-only root token into a Kubernetes Secret, without writing it to the checkout or printing it;
-- configures OpenBao Kubernetes Auth for the operator ServiceAccount and gives that role only the identity, ACL policy, and token lifecycle permissions needed by the test;
+- configures OpenBao Kubernetes Auth for the operator ServiceAccount and gives that role only the identity, ACL policy, Kubernetes Auth role, and token lifecycle permissions needed by the test;
 - builds and loads the operator image;
 - installs the generated CRDs and operator Helm chart;
 - verifies CRD installation, namespace-scoped manager RoleBindings, and that a
   valid connection outside the configured watch namespace is not reconciled;
 - configures OpenBao Kubernetes Auth and verifies a real projected ServiceAccount login;
 - configures OpenBao AppRole and verifies a real role ID and Secret ID login;
-- verifies one successful ACL policy and entity graph, including policy status version/hash and entity ID persistence;
+- verifies one successful ACL policy, Kubernetes Auth role, and entity graph, including policy status version/hash, role configuration hash, role-bound workload login, and rejection of an unbound ServiceAccount;
 - verifies one entity alias binding and one internal group membership against the live OpenBao API;
 - verifies that a Delete-policy entity retains its finalizer while a token credential is unavailable, then completes external cleanup after the credential is restored;
 - provisions two isolated OpenBao namespaces and platform-owned Kubernetes Auth
   connections;
 - verifies tenant ServiceAccounts cannot read Secrets, manage connections, or
   access the other tenant's Kubernetes resources;
-- verifies each tenant can reconcile its own policy/entity graph while a token
+- verifies each tenant can reconcile its own policy/entity graph and workload
+  Kubernetes Auth role while a token
   from either OpenBao namespace cannot mutate the other namespace;
 - removes the temporary test namespaces after a successful run.
 
@@ -63,7 +64,7 @@ Failed runs preserve the test namespaces so status and logs remain available:
 
 ```sh
 kubectl --context kind-openbao-entity-operator get pods -A
-kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaopolicies,openbaoentities,openbaoentityaliases,openbaogroups,openbaogroupmemberships -n openbao-entity-operator-e2e
+kubectl --context kind-openbao-entity-operator get openbaoconnections,openbaopolicies,openbaokubernetesauthroles,openbaoentities,openbaoentityaliases,openbaogroups,openbaogroupmemberships -n openbao-entity-operator-e2e
 kubectl --context kind-openbao-entity-operator describe openbaoentity/e2e-entity -n openbao-entity-operator-e2e
 kubectl --context kind-openbao-entity-operator logs deployment/openbao-entity-operator -n openbao-entity-operator-system
 ```
@@ -74,8 +75,8 @@ After inspection, remove only the retained E2E resources with the dependency-awa
 make kind-e2e-clean
 ```
 
-The cleanup target deletes membership claims, aliases, policies, groups,
-entities, and connections in that order, removes the two test namespaces, and
+The cleanup target deletes membership claims, aliases, Kubernetes Auth roles,
+policies, groups, entities, and connections in that order, removes the two test namespaces, and
 removes the fixed multi-tenancy OpenBao namespaces when the disposable server
 is available. It stops if a resource remains blocked by a non-recoverable
 finalizer so the failure is visible.

@@ -437,6 +437,8 @@ func newTestClient(objects ...client.Object) client.Client {
 			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoGroupMembership"}
 		case *openbaov1alpha1.OpenBaoPolicy:
 			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoPolicy"}
+		case *openbaov1alpha1.OpenBaoKubernetesAuthRole:
+			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoKubernetesAuthRole"}
 		}
 	}
 	runtimeObjects := make([]runtime.Object, 0, len(objects))
@@ -444,7 +446,7 @@ func newTestClient(objects ...client.Object) client.Client {
 		runtimeObjects = append(runtimeObjects, object)
 	}
 	result := fake.NewClientBuilder().WithScheme(scheme).
-		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}, &openbaov1alpha1.OpenBaoGroup{}, &openbaov1alpha1.OpenBaoGroupMembership{}, &openbaov1alpha1.OpenBaoPolicy{}).
+		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}, &openbaov1alpha1.OpenBaoGroup{}, &openbaov1alpha1.OpenBaoGroupMembership{}, &openbaov1alpha1.OpenBaoPolicy{}, &openbaov1alpha1.OpenBaoKubernetesAuthRole{}).
 		WithRuntimeObjects(runtimeObjects...).Build()
 	return result
 }

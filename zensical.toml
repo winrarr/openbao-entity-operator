@@ -32,6 +32,7 @@ nav = [
     { "Overview" = "crds/index.md" },
     { "OpenBaoConnection" = "crds/openbao-connection.md" },
     { "OpenBaoPolicy" = "crds/openbao-policy.md" },
+    { "OpenBaoKubernetesAuthRole" = "crds/openbao-kubernetes-auth-role.md" },
     { "OpenBaoEntity" = "crds/openbao-entity.md" },
     { "OpenBaoEntityAlias" = "crds/openbao-entity-alias.md" },
     { "OpenBaoGroup" = "crds/openbao-group.md" },

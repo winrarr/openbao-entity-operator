@@ -130,6 +130,8 @@ reset_remote_test_objects() {
     openbao_cli delete "identity/entity/name/${name}" >/dev/null 2>&1 || true
   done
 
+  openbao_cli delete auth/kubernetes/role/e2e-managed-role >/dev/null 2>&1 || true
+
   for name in e2e-policy e2e-policy-conflict e2e-policy-adopt e2e-policy-orphan e2e-policy-delete; do
     openbao_cli delete "sys/policies/acl/${name}" >/dev/null 2>&1 || true
   done
@@ -189,6 +191,14 @@ path "sys/policies/acl/*" {
 path "sys/policies/acl" {
   capabilities = ["create", "read", "update", "delete", "list"]
 }
+
+path "auth/kubernetes/role" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "auth/kubernetes/role/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
 EOF
 
   openbao_cli write auth/kubernetes/role/e2e-operator \
@@ -231,7 +241,7 @@ kubectl_cmd -n "${OPENBAO_NAMESPACE}" wait --for=condition=available \
 kubectl_cmd -n "${OPERATOR_NAMESPACE}" wait --for=condition=available \
   "deployment/${operator_deployment}" --timeout=5m >/dev/null
 
-for crd in openbaoconnections openbaopolicies openbaoentities openbaoentityaliases openbaogroups openbaogroupmemberships; do
+for crd in openbaoconnections openbaopolicies openbaokubernetesauthroles openbaoentities openbaoentityaliases openbaogroups openbaogroupmemberships; do
   kubectl_cmd get crd "${crd}.openbao.openbao-operator.io" >/dev/null
 done
 kubectl_cmd -n "${TEST_NAMESPACE}" get rolebinding "${operator_deployment}-manager" >/dev/null
@@ -335,6 +345,39 @@ policy_version="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaopolicy/e2e-polic
 assert_remote_policy e2e-policy 'path "identity/entity/name/e2e-entity" {
   capabilities = ["read"]
 }'
+
+kubectl_cmd -n "${TEST_NAMESPACE}" create serviceaccount e2e-workload --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
+cat <<EOF | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoKubernetesAuthRole
+metadata:
+  name: e2e-managed-role
+spec:
+  connectionRef:
+    name: openbao
+  boundServiceAccountNames:
+    - e2e-workload
+  boundServiceAccountNamespaces:
+    - ${TEST_NAMESPACE}
+  tokenPolicies:
+    - e2e-policy
+  tokenPeriod: 5m
+EOF
+wait_ready openbaokubernetesauthrole/e2e-managed-role
+role_hash="$(kubectl_cmd -n "${TEST_NAMESPACE}" get openbaokubernetesauthrole/e2e-managed-role -o jsonpath='{.status.configHash}')"
+[[ -n "${role_hash}" ]] || { echo "Kubernetes Auth role did not publish a configuration hash" >&2; exit 1; }
+openbao_cli read -format=json auth/kubernetes/role/e2e-managed-role | jq -e \
+  --arg namespace "${TEST_NAMESPACE}" \
+  '.data as $data | ($data.bound_service_account_names | index("e2e-workload")) != null and ($data.bound_service_account_namespaces | index($namespace)) != null and ($data.token_policies | index("e2e-policy")) != null' >/dev/null
+workload_jwt="$(kubectl_cmd -n "${TEST_NAMESPACE}" create token e2e-workload --duration=10m)"
+openbao_cli write -format=json auth/kubernetes/login role=e2e-managed-role jwt="${workload_jwt}" | jq -e \
+  '.auth.policies | index("e2e-policy") != null' >/dev/null
+kubectl_cmd -n "${TEST_NAMESPACE}" create serviceaccount e2e-other --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
+other_jwt="$(kubectl_cmd -n "${TEST_NAMESPACE}" create token e2e-other --duration=10m)"
+if openbao_cli write -format=json auth/kubernetes/login role=e2e-managed-role jwt="${other_jwt}" >/dev/null 2>&1; then
+  echo "Kubernetes Auth role accepted an unbound ServiceAccount" >&2
+  exit 1
+fi
 
 cat <<'EOF' | kubectl_cmd -n "${TEST_NAMESPACE}" apply -f - >/dev/null
 apiVersion: openbao.openbao-operator.io/v1alpha1

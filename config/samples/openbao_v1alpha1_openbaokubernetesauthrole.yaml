@@ -1,0 +1,17 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoKubernetesAuthRole
+metadata:
+  name: payments-workload
+  namespace: openbao
+spec:
+  connectionRef:
+    name: openbao
+  mountPath: kubernetes
+  boundServiceAccountNames:
+    - payments
+  boundServiceAccountNamespaces:
+    - payments
+  tokenPolicies:
+    - payments-read
+  tokenTTL: 1h
+  tokenMaxTTL: 4h

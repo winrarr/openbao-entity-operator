@@ -12,6 +12,7 @@ enums, and validation rules.
 ## Policies and identities
 
 - [OpenBaoPolicy](openbao-policy.md)
+- [OpenBaoKubernetesAuthRole](openbao-kubernetes-auth-role.md)
 - [OpenBaoEntity](openbao-entity.md)
 - [OpenBaoEntityAlias](openbao-entity-alias.md)
 

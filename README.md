@@ -7,10 +7,10 @@ Kubernetes-native lifecycle management for OpenBao ACL policies and identity ent
 The current vertical slice gives platform teams a declarative boundary around one OpenBao instance and its identity resources:
 
 ```text
-Kubernetes Secret → OpenBaoConnection → OpenBaoPolicy / OpenBaoEntity / OpenBaoGroup → membership claims
+Kubernetes Secret → OpenBaoConnection → OpenBaoPolicy / OpenBaoKubernetesAuthRole / OpenBaoEntity / OpenBaoGroup → membership claims
 ```
 
-The operator validates connectivity, reconciles named ACL policy documents, entity metadata, policies, and disabled state, binds auth-method aliases to entities, manages internal groups and explicit membership edges, reports stable external IDs in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
+The operator validates connectivity, reconciles named ACL policy documents and Kubernetes Auth roles, manages entity metadata, policies, and disabled state, binds auth-method aliases to entities, manages internal groups and explicit membership edges, reports stable external IDs in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
 
 ## Quick start
 

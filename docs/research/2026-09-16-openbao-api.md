@@ -14,6 +14,7 @@ Primary sources:
 - [OpenBao identity entity API](https://openbao.org/docs/2.4.x/api/secret/identity/entity/)
 - [OpenBao identity concepts](https://openbao.org/docs/next/concepts/identity/)
 - [OpenBao Kubernetes Auth](https://openbao.org/docs/next/auth/kubernetes/)
+- [OpenBao Kubernetes Auth (current documentation)](https://openbao.org/docs/auth/kubernetes/)
 - [OpenBao AppRole](https://openbao.org/docs/auth/approle/)
 - [OpenBao token auth API](https://openbao.org/docs/2.4.x/api/auth/token/)
 - [OpenBao ACL policy API](https://openbao.org/docs/2.4.x/api/system/policies/)
@@ -35,6 +36,7 @@ Primary sources:
 - OpenBao's AppRole login endpoint is `POST /v1/auth/<mount>/login` (the default mount is `approle`). It accepts `role_id` and `secret_id` and returns an `auth.client_token` with lease duration and renewability metadata. The mount, role, and Secret ID lifecycle must be managed outside the operator.
 - The token API exposes `POST /v1/auth/token/renew-self` for renewing the current token. The client uses that endpoint before a renewable lease expires and falls back to a fresh Kubernetes Auth login when renewal fails or a request is rejected.
 - OpenBao ACL policies are managed through `GET`, `POST`, and `DELETE /v1/sys/policies/acl/:name`; the list endpoint is `/v1/sys/policies/acl`. Reads return the document in `data.policy` and include the policy name and version. Writes send the document in a `policy` request field.
+- OpenBao Kubernetes Auth workload roles are managed below `auth/<mount>/role/<name>`. The official role example binds ServiceAccount names and namespaces and sets token policy and lifetime fields; the mount and Kubernetes TokenReview configuration must exist before role operations are useful. The operator maps the supported Kubernetes fields to the token-prefixed role wire keys and keeps mount enablement outside its scope.
 
 ## Generated reference
 
@@ -58,6 +60,7 @@ The resulting document is OpenAPI 3.0.2, contains 231 paths and includes the ide
 - The OpenAPI snapshot is a semantic reference rather than a generator input because OpenBao generates it at runtime and it can vary with version and enabled mounts.
 - The checked-in runtime OpenAPI snapshot does not include the Kubernetes Auth login route because the snapshot was captured before that plugin mount was enabled. The route is therefore tracked against the official auth documentation and covered by focused HTTP contract tests rather than added as an unavailable snapshot path.
 - The checked-in runtime OpenAPI snapshot also does not include the AppRole login route because auth plugin routes are mount-dependent. The route is tracked against the official AppRole documentation and covered by focused HTTP contract tests rather than added as an unavailable snapshot path.
+- The checked-in runtime OpenAPI snapshot does not include the Kubernetes Auth role route because auth plugin routes are mount-dependent. The role route and field behavior are tracked against the official Kubernetes Auth documentation and the verified OpenBao v2.6.2 Kind instance, then covered by focused HTTP contract tests and the narrow live role scenario.
 - A small typed client is sufficient for the current entity and connection stories and keeps unrelated secret-engine APIs outside the initial dependency surface.
 - Namespace targeting belongs on `OpenBaoConnection` because it changes the API and credential context for every resource using that connection. The operator therefore validates and applies one header in the shared client rather than duplicating namespace handling across controllers.
 - The user-facing policy field is named `rules` while the typed client maps it to OpenBao's `policy` field. This keeps the Kubernetes resource clear without hiding the OpenBao wire contract.

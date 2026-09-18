@@ -173,6 +173,14 @@ path "sys/policies/acl/*" {
 path "sys/policies/acl" {
   capabilities = ["create", "read", "update", "delete", "list"]
 }
+
+path "auth/kubernetes/role" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "auth/kubernetes/role/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
 EOF
 
   openbao_cli_namespace "${namespace}" write "auth/kubernetes/role/${auth_role}" \
@@ -218,7 +226,7 @@ create_platform_fixture_secret() {
 
 cleanup_success() {
   for namespace in "${TEST_NAMESPACE}" "${TENANT_B_NAMESPACE}"; do
-    for resource in openbaogroupmemberships openbaoentityaliases openbaopolicies openbaogroups openbaoentities openbaoconnections; do
+    for resource in openbaogroupmemberships openbaoentityaliases openbaokubernetesauthroles openbaopolicies openbaogroups openbaoentities openbaoconnections; do
       kubectl_cmd -n "${namespace}" delete "${resource}" --all --ignore-not-found=true --wait=true --timeout="${DELETE_TIMEOUT}" >/dev/null
     done
   done
@@ -253,6 +261,8 @@ tenant_b_principal="$(service_account_principal "${TENANT_B_NAMESPACE}" tenant-b
 
 assert_can "${tenant_a_principal}" "${TEST_NAMESPACE}" create openbaoentities
 assert_can "${tenant_b_principal}" "${TENANT_B_NAMESPACE}" create openbaoentities
+assert_can "${tenant_a_principal}" "${TEST_NAMESPACE}" create openbaokubernetesauthroles
+assert_can "${tenant_b_principal}" "${TENANT_B_NAMESPACE}" create openbaokubernetesauthroles
 for principal in "${tenant_a_principal}" "${tenant_b_principal}"; do
   namespace="${TEST_NAMESPACE}"
   [[ "${principal}" == "${tenant_b_principal}" ]] && namespace="${TENANT_B_NAMESPACE}"
@@ -264,6 +274,8 @@ assert_cannot "${tenant_a_principal}" "${TENANT_B_NAMESPACE}" get openbaoentitie
 assert_cannot "${tenant_a_principal}" "${TENANT_B_NAMESPACE}" create openbaoentities
 assert_cannot "${tenant_b_principal}" "${TEST_NAMESPACE}" get openbaoentities
 assert_cannot "${tenant_b_principal}" "${TEST_NAMESPACE}" create openbaoentities
+assert_cannot "${tenant_a_principal}" "${TENANT_B_NAMESPACE}" get openbaokubernetesauthroles
+assert_cannot "${tenant_b_principal}" "${TEST_NAMESPACE}" get openbaokubernetesauthroles
 
 configure_openbao_tenant "${TENANT_A_OPENBAO_NAMESPACE}" "${TENANT_A_AUTH_ROLE}"
 configure_openbao_tenant "${TENANT_B_OPENBAO_NAMESPACE}" "${TENANT_B_AUTH_ROLE}"
@@ -271,6 +283,11 @@ create_platform_connection "${TEST_NAMESPACE}" platform-connection "${TENANT_A_O
 create_platform_connection "${TENANT_B_NAMESPACE}" platform-connection "${TENANT_B_OPENBAO_NAMESPACE}" "${TENANT_B_AUTH_ROLE}"
 create_platform_fixture_secret "${TEST_NAMESPACE}"
 create_platform_fixture_secret "${TENANT_B_NAMESPACE}"
+for fixture in tenant-a-workload tenant-b-workload; do
+  namespace="${TEST_NAMESPACE}"
+  [[ "${fixture}" == tenant-b-workload ]] && namespace="${TENANT_B_NAMESPACE}"
+  kubectl_cmd -n "${namespace}" create serviceaccount "${fixture}" --dry-run=client -o yaml | kubectl_cmd apply -f - >/dev/null
+done
 
 kubectl_cmd -n "${TEST_NAMESPACE}" wait --for='jsonpath={.status.conditions[?(@.type=="Ready")].status}=True' \
   openbaoconnection/platform-connection --timeout=5m >/dev/null
@@ -331,10 +348,45 @@ spec:
     - tenant-b-policy
 EOF
 
+cat <<EOF | apply_as "${TEST_NAMESPACE}" tenant-a-user >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoKubernetesAuthRole
+metadata:
+  name: tenant-a-workload
+spec:
+  connectionRef:
+    name: platform-connection
+  boundServiceAccountNames:
+    - tenant-a-workload
+  boundServiceAccountNamespaces:
+    - ${TEST_NAMESPACE}
+  tokenPolicies:
+    - ${TENANT_A_AUTH_ROLE}
+  tokenPeriod: 5m
+EOF
+cat <<EOF | apply_as "${TENANT_B_NAMESPACE}" tenant-b-user >/dev/null
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoKubernetesAuthRole
+metadata:
+  name: tenant-b-workload
+spec:
+  connectionRef:
+    name: platform-connection
+  boundServiceAccountNames:
+    - tenant-b-workload
+  boundServiceAccountNamespaces:
+    - ${TENANT_B_NAMESPACE}
+  tokenPolicies:
+    - ${TENANT_B_AUTH_ROLE}
+  tokenPeriod: 5m
+EOF
+
 wait_ready_as "${TEST_NAMESPACE}" tenant-a-user openbaopolicy/tenant-a-policy
 wait_ready_as "${TEST_NAMESPACE}" tenant-a-user openbaoentity/tenant-a-entity
 wait_ready_as "${TENANT_B_NAMESPACE}" tenant-b-user openbaopolicy/tenant-b-policy
 wait_ready_as "${TENANT_B_NAMESPACE}" tenant-b-user openbaoentity/tenant-b-entity
+wait_ready_as "${TEST_NAMESPACE}" tenant-a-user openbaokubernetesauthrole/tenant-a-workload
+wait_ready_as "${TENANT_B_NAMESPACE}" tenant-b-user openbaokubernetesauthrole/tenant-b-workload
 
 openbao_cli_namespace "${TENANT_A_OPENBAO_NAMESPACE}" read identity/entity/name/tenant-a-entity >/dev/null
 openbao_cli_namespace "${TENANT_B_OPENBAO_NAMESPACE}" read identity/entity/name/tenant-b-entity >/dev/null
@@ -356,5 +408,16 @@ assert_command_denied openbao_cli_namespace_with_token "${TENANT_B_OPENBAO_NAMES
   write identity/entity/name/tenant-b-escape name=tenant-b-escape
 assert_command_denied openbao_cli_namespace_with_token "${TENANT_A_OPENBAO_NAMESPACE}" "${tenant_b_token}" \
   write identity/entity/name/tenant-a-escape name=tenant-a-escape
+
+tenant_a_workload_jwt="$(kubectl_cmd -n "${TEST_NAMESPACE}" create token tenant-a-workload --duration=10m)"
+tenant_b_workload_jwt="$(kubectl_cmd -n "${TENANT_B_NAMESPACE}" create token tenant-b-workload --duration=10m)"
+tenant_a_workload_token="$(openbao_cli_namespace "${TENANT_A_OPENBAO_NAMESPACE}" write -field=token auth/kubernetes/login role=tenant-a-workload jwt="${tenant_a_workload_jwt}")"
+tenant_b_workload_token="$(openbao_cli_namespace "${TENANT_B_OPENBAO_NAMESPACE}" write -field=token auth/kubernetes/login role=tenant-b-workload jwt="${tenant_b_workload_jwt}")"
+openbao_cli_namespace_with_token "${TENANT_A_OPENBAO_NAMESPACE}" "${tenant_a_workload_token}" read auth/token/lookup-self >/dev/null
+openbao_cli_namespace_with_token "${TENANT_B_OPENBAO_NAMESPACE}" "${tenant_b_workload_token}" read auth/token/lookup-self >/dev/null
+if openbao_cli_namespace "${TENANT_A_OPENBAO_NAMESPACE}" write -field=token auth/kubernetes/login role=tenant-a-workload jwt="${tenant_b_workload_jwt}" >/dev/null 2>&1; then
+  echo "tenant A Kubernetes Auth role accepted tenant B's ServiceAccount" >&2
+  exit 1
+fi
 
 echo "Kubernetes and OpenBao tenant isolation scenarios passed"

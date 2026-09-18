@@ -2,7 +2,7 @@
 
 ## Context
 
-The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers token-, Kubernetes-authenticated, and AppRole connections, ACL policy lifecycle, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
+The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers token-, Kubernetes-authenticated, and AppRole connections, ACL policy lifecycle, Kubernetes Auth role lifecycle inside preconfigured mounts, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
 
 ## Current stories
 
@@ -159,6 +159,21 @@ Acceptance criteria:
 
 Design criteria: explicit watch and reference scope, least-privilege RBAC, platform-owned connection and credential material, stable external-domain binding, admission-policy integration, and focused boundary verification.
 
+### US-012 — Manage Kubernetes Auth workload roles
+
+As a platform operator, I want to declare the ServiceAccount bindings and token policy of an OpenBao Kubernetes Auth role, so that workload authentication is versioned and drift-corrected without putting auth-mount administration in the operator.
+
+Acceptance criteria:
+
+- Given a ready connection with permission to manage an existing Kubernetes Auth mount and an absent role, when an `OpenBaoKubernetesAuthRole` uses `creationPolicy=Create`, then the role is created at the selected `auth/<mount>/role/<name>` path and its normalized configuration hash is recorded in status.
+- Given an existing role, when `creationPolicy=Create`, then reconciliation reports a conflict without overwriting it; `Adopt` and `CreateOrAdopt` explicitly allow management.
+- Given a managed role whose ServiceAccount bindings, token policies, or token lifetimes change outside Kubernetes, when drift detection runs, then the declared role configuration is restored.
+- Given `deletionPolicy=Orphan`, when the Kubernetes resource is deleted, then the OpenBao role remains; given `deletionPolicy=Delete`, then the role is deleted before its finalizer is released.
+- Given the connection or its credentials are unavailable during Delete-policy cleanup, then the finalizer is retained, `CleanupRequired=True` is reported, and cleanup resumes after the dependency is restored.
+- Given a tenant-author RBAC profile and a platform-owned connection whose OpenBao policy is scoped to the tenant domain, when a tenant manages a role in its namespace, then it cannot use the role resource to read or mutate another tenant's connection, credential, or OpenBao namespace.
+
+Design criteria: preconfigured auth-mount boundary, immutable connection and mount references, explicit create/adopt and deletion policy, normalized set comparison, whole-second OpenBao duration encoding, native OpenBao ACL authorization, no credential status, and focused live tenant-boundary verification.
+
 ## Design alternatives and recommendation
 
 | Story | Status | Narrow typed HTTP client + explicit CRDs | Full OpenBao SDK + generic resource layer | Notes |
@@ -174,6 +189,7 @@ Design criteria: explicit watch and reference scope, least-privilege RBAC, platf
 | US-009 | Current | Covered now | Supported later | A typed policy client keeps the raw document and ownership semantics visible without exposing arbitrary system paths |
 | US-010 | Current | Covered now | Covered now | AppRole extends the connection boundary with lazy credential sources and shared token lease handling |
 | US-011 | Current slice | Covered now | Covered now | `watchNamespaces`, scoped Helm RoleBindings, the tenant-author RBAC profile, platform-owned connections, OpenBao namespaces, and the two-tenant Kind scenario cover the supported model |
+| US-012 | Current | Covered now | Supported later | The role endpoint is a narrow typed extension; mount enablement and TokenReview configuration remain outside the operator, and OpenBao ACLs provide the runtime authorization boundary |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.
 

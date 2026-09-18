@@ -8,6 +8,7 @@ Kubernetes API
     ├── OpenBaoConnectionReconciler ──┐
     │                                 │
     ├── OpenBaoPolicyReconciler ──────┤
+    ├── OpenBaoKubernetesAuthRole ────┤
     ├── OpenBaoEntityReconciler ──────┤
     ├── OpenBaoEntityAliasReconciler ─┤
     └── OpenBaoGroupReconciler ──────┼── internal/openbaoclient ── OpenBao HTTP API
@@ -60,6 +61,22 @@ Policy deletion is orphaning by default and requires `deletionPolicy: Delete` to
 call OpenBao. The controller watches its connection and uses the same shared
 client/cache as the identity controllers, including Kubernetes Auth lease
 handling and namespace routing.
+
+## Kubernetes Auth role flow
+
+`OpenBaoKubernetesAuthRoleReconciler` uses the Kubernetes resource name as the
+OpenBao role name and the immutable `mountPath` as the auth mount boundary. It
+reads the role from `auth/<mount>/role/<name>`, applies explicit create/adopt
+semantics, compares normalized ServiceAccount bindings, token policies, and
+whole-second token lifetimes, and writes only when drift is present. Status
+stores the mount, role name, and a hash of the normalized observed
+configuration; it does not store credentials.
+
+The controller deliberately stops at the role endpoint. Enabling the auth
+mount and configuring its Kubernetes API TokenReview credentials remain
+platform-owned OpenBao administration. The connection's OpenBao ACL is the
+authorization boundary for role mutation, which lets tenant deployments use
+native OpenBao permissions without adding a Kyverno runtime dependency.
 
 ## Group and membership flow
 

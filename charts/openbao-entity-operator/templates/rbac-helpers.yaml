@@ -149,6 +149,7 @@ rules:
   - openbaogroups
   - openbaogroupmemberships
   - openbaopolicies
+  - openbaokubernetesauthroles
   verbs:
   - create
   - delete

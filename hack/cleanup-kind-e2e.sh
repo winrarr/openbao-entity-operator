@@ -24,7 +24,7 @@ cleanup_namespace() {
     return 0
   fi
 
-  for resource in openbaogroupmemberships openbaoentityaliases openbaopolicies openbaogroups openbaoentities openbaoconnections; do
+  for resource in openbaogroupmemberships openbaoentityaliases openbaokubernetesauthroles openbaopolicies openbaogroups openbaoentities openbaoconnections; do
     echo "Deleting ${resource} in ${namespace}"
     kubectl_cmd -n "${namespace}" delete "${resource}" --all --ignore-not-found=true --wait=true --timeout="${DELETE_TIMEOUT}" >/dev/null
   done

@@ -52,3 +52,35 @@ fixed operator-owned connection flag or a first-class OpenBao domain resource
 until a concrete shared-installation use case shows that scoped installations,
 platform-owned connections, Kubernetes RBAC, and OpenBao-native namespaces are
 insufficient.
+
+## BL-002: Manage Kubernetes Auth workload roles
+
+Status: complete
+
+Goal: let platform operators declare the ServiceAccount bindings and token
+configuration of an OpenBao Kubernetes Auth role while keeping auth-mount
+enablement and TokenReview administration outside this operator.
+
+Rationale: workload authentication is a natural next resource after
+Kubernetes-authenticated connections, but the operator should not become a
+generic OpenBao configuration layer. A role-scoped CRD provides useful
+declarative lifecycle management while OpenBao ACLs remain the native
+authorization boundary.
+
+Constraints: support only the newest selected OpenBao release; keep the
+connection and mount path immutable; use explicit create/adopt and deletion
+policies; do not store tokens or JWTs; compare sets deterministically; encode
+durations as whole seconds; and keep live coverage focused on role lifecycle
+and tenant isolation rather than duplicating OpenBao's own auth tests.
+
+Acceptance criteria:
+
+- `OpenBaoKubernetesAuthRole` manages bindings, token policies, and token
+  lifetimes through the typed role endpoint with status hash and conditions.
+- Existing roles require explicit adoption and external drift is corrected.
+- Orphan and Delete semantics are covered, including retained finalizers when
+  cleanup credentials are unavailable.
+- The tenant-author RBAC profile includes the role resource without granting
+  tenant access to platform-owned connections or Secrets.
+- Unit, HTTP contract, generated-artifact, documentation, and focused Kind
+  tests verify the feature.

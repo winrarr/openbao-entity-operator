@@ -9,7 +9,7 @@ mutually untrusted Kubernetes users.
 | Boundary | Current behavior | What it provides |
 | --- | --- | --- |
 | Kubernetes custom resources | All operator resources are namespaced | Kubernetes RBAC can limit which namespaces a tenant may manage |
-| Resource references | All connection, policy, entity, alias, group, membership, and credential references are same-namespace | A CR cannot select another namespace's referenced object through the API |
+| Resource references | All connection, policy, Kubernetes Auth role, entity, alias, group, membership, and credential references are same-namespace | A CR cannot select another namespace's referenced object through the API |
 | OpenBao namespace | `OpenBaoConnection.spec.namespace` routes every request through one OpenBao namespace | External identity and policy isolation when OpenBao namespaces are already provisioned and authorized |
 | OpenBao connection sharing | Each `OpenBaoConnection` is namespaced; there is no cluster-scoped connection | A platform can create one connection per tenant namespace, but there is no built-in shared-connection policy |
 | Operator scope | `watchNamespaces` can limit the manager cache and Helm manager permissions to listed namespaces; empty keeps cluster-wide behavior | A separately scoped installation can avoid reading or watching other namespaces |
@@ -36,8 +36,8 @@ constrained by an OpenBao namespace:
    needed.
 4. Bind `<release-name>-tenant-author-role` to the tenant ServiceAccount with a
    namespace `RoleBinding`. This profile allows CRUD access to policies,
-   entities, aliases, groups, and group memberships only. It does not grant
-   access to connections or Secrets.
+   Kubernetes Auth roles, entities, aliases, groups, and group memberships
+   only. It does not grant access to connections or Secrets.
 5. Use admission policy when the platform needs additional rules for names,
    deletion policies, labels, or resource kinds. The operator intentionally
    does not become a tenant admission controller.
@@ -76,6 +76,10 @@ path "identity/*" {
 }
 
 path "sys/policies/acl/*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}
+
+path "auth/kubernetes/role/*" {
   capabilities = ["create", "read", "update", "delete", "list"]
 }
 EOF
@@ -130,7 +134,8 @@ The platform-owned connection and tenant resource-kind model is recorded in
 [Decision 0007](../decisions/0007-tenant-boundary-enforcement.md). A future
 fixed-connection or first-class domain resource remains deliberately deferred
 until a concrete shared-installation use case requires controller-enforced
-selection.
+selection. The role-specific boundary is recorded in
+[Decision 0010](../decisions/0010-kubernetes-auth-role-boundary.md).
 
 The comparison that informed this boundary is recorded in the
 [multi-tenancy research note](../research/2026-09-16-multi-tenancy.md).

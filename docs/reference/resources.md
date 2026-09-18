@@ -10,6 +10,7 @@ generated API reference for exact fields, defaults, and validation.
 ## Policies and identity
 
 - [OpenBaoPolicy](../crds/openbao-policy.md) · [API](api.md#openbaopolicy)
+- [OpenBaoKubernetesAuthRole](../crds/openbao-kubernetes-auth-role.md) · [API](api.md#openbaokubernetesauthrole)
 - [OpenBaoEntity](../crds/openbao-entity.md) · [API](api.md#openbaoentity)
 - [OpenBaoEntityAlias](../crds/openbao-entity-alias.md) · [API](api.md#openbaoentityalias)
 

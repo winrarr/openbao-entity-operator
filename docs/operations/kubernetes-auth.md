@@ -7,11 +7,13 @@ should not hold a long-lived OpenBao token Secret.
 ## OpenBao-side setup
 
 An OpenBao administrator must enable and configure the Kubernetes Auth method,
-then create a role bound to the operator's Kubernetes ServiceAccount and
-namespace. The role policy should grant only the identity and token operations
-needed by the resources managed through that connection. The operator does not
-enable auth mounts, configure TokenReview credentials, create policies, or
-create roles.
+including its Kubernetes API TokenReview credentials. The role used by the
+operator must be bound to the operator's Kubernetes ServiceAccount and
+namespace. Its policy should grant only the identity, policy, and role
+operations needed by the resources managed through that connection. The
+operator does not enable auth mounts or configure TokenReview credentials, but
+it can manage individual workload roles with `OpenBaoKubernetesAuthRole` when
+the connection policy allows it.
 
 The auth mount defaults to `kubernetes`. Set `spec.kubernetesAuth.mountPath`
 when OpenBao uses another mount path. The value is the mount path below `auth/`,
@@ -55,6 +57,33 @@ never copied into resource status or log fields.
 If the auth role, ServiceAccount binding, TokenReview configuration, or projected
 token is invalid, the connection remains not ready and dependent identity
 resources do not perform OpenBao mutations.
+
+## Workload roles
+
+Use `OpenBaoKubernetesAuthRole` to manage a role in the already configured
+mount. The resource's Kubernetes name is the OpenBao role name, and the mount
+path is relative to `auth/`:
+
+```yaml
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoKubernetesAuthRole
+metadata:
+  name: payments-workload
+  namespace: payments
+spec:
+  connectionRef:
+    name: openbao
+  boundServiceAccountNames: [payments]
+  boundServiceAccountNamespaces: [payments]
+  tokenPolicies: [payments-read]
+  tokenTTL: 1h
+```
+
+Keep the connection platform-owned in a tenant deployment. OpenBao's ACL on
+that connection is what limits which role paths and token policies the
+operator can mutate; the Kubernetes role resource itself is not an admission
+policy. See the [role resource guide](../crds/openbao-kubernetes-auth-role.md)
+and [multi-tenancy guide](../reference/multi-tenancy.md).
 
 See the [local Kind guide](local-kind.md) for a complete disposable setup and
 the [OpenBao API research note](../research/2026-09-16-openbao-api.md) for the

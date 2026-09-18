@@ -2,10 +2,11 @@
 
 ## Orientation
 
-This is a Go 1.27 Kubernetes operator for OpenBao ACL policies, identity entities, and groups. The public API in `api/openbao/v1alpha1` is the source of truth for the namespaced `OpenBaoConnection`, `OpenBaoPolicy`, `OpenBaoEntity`, `OpenBaoEntityAlias`, `OpenBaoGroup`, and `OpenBaoGroupMembership` CRDs.
+This is a Go 1.27 Kubernetes operator for OpenBao ACL policies, Kubernetes Auth roles, identity entities, and groups. The public API in `api/openbao/v1alpha1` is the source of truth for the namespaced `OpenBaoConnection`, `OpenBaoPolicy`, `OpenBaoKubernetesAuthRole`, `OpenBaoEntity`, `OpenBaoEntityAlias`, `OpenBaoGroup`, and `OpenBaoGroupMembership` CRDs.
 
 - `OpenBaoConnection` validates an OpenBao address and one supported authentication method (token Secret, Kubernetes Auth, or AppRole), then records health and authentication status.
 - `OpenBaoPolicy` reconciles a named OpenBao ACL policy document, including explicit creation/adoption, drift correction, and optional deletion.
+- `OpenBaoKubernetesAuthRole` reconciles a role in a preconfigured OpenBao Kubernetes Auth mount, including explicit creation/adoption, drift correction, and optional deletion.
 - `OpenBaoEntity` creates, adopts, updates, observes, and optionally deletes one OpenBao identity entity. The Kubernetes object name is the OpenBao entity name.
 - `OpenBaoEntityAlias` binds an auth-method mount accessor and alias name to a referenced entity, with explicit adoption and deletion policies.
 - `OpenBaoGroup` creates, adopts, updates, observes, and optionally deletes an OpenBao identity group.
@@ -25,6 +26,7 @@ This is a Go 1.27 Kubernetes operator for OpenBao ACL policies, identity entitie
 - Connection and external identity references are same-namespace and immutable for `OpenBaoEntity`, `OpenBaoEntityAlias`, and `OpenBaoGroup`; changing the target requires deleting and recreating the resource. Group membership references are also immutable and require exactly one entity or subgroup target.
 - `OpenBaoEntity` defaults to `creationPolicy: Create` and `deletionPolicy: Orphan`. External deletion is always opt-in.
 - `OpenBaoGroup` defaults to `creationPolicy: Create` and `deletionPolicy: Orphan`; `OpenBaoGroupMembership` never deletes a group or entity.
+- `OpenBaoKubernetesAuthRole` defaults to `creationPolicy: Create` and `deletionPolicy: Orphan`; its connection and mount path are immutable, and it never manages auth-mount enablement or TokenReview configuration.
 - Preserve unrelated work in a dirty worktree. Generated files are derived output and should be reviewed for drift, not hand-edited.
 
 ## Canonical commands
