@@ -87,6 +87,26 @@ func TestEntityClientUsesOpenBaoHeadersAndPaths(t *testing.T) {
 	}
 }
 
+func TestIsNotFoundRecognizesOpenBaoMissingMountResponses(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "http 404", err: &HTTPError{StatusCode: http.StatusNotFound}, want: true},
+		{name: "missing secret engine mount", err: &HTTPError{StatusCode: http.StatusBadRequest, Body: `{"errors":["No secret engine mount at payments/"]}`}, want: true},
+		{name: "missing auth method mount", err: &HTTPError{StatusCode: http.StatusBadRequest, Body: `{"errors":["No auth method mount at custom/"]}`}, want: true},
+		{name: "other bad request", err: &HTTPError{StatusCode: http.StatusBadRequest, Body: `{"errors":["invalid request"]}`}, want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := IsNotFound(test.err); got != test.want {
+				t.Fatalf("IsNotFound() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestKubernetesAuthClientLogsInAndRenewsToken(t *testing.T) {
 	var loginCalls, lookupCalls, renewCalls, jwtCalls int
 	now := time.Date(2026, 9, 16, 12, 0, 0, 0, time.UTC)

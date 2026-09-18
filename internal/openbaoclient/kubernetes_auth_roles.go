@@ -33,6 +33,12 @@ type KubernetesAuthRole struct {
 	TokenTTL                      int64    `json:"token_ttl"`
 	TokenMaxTTL                   int64    `json:"token_max_ttl"`
 	TokenPeriod                   int64    `json:"token_period"`
+	Audience                      string   `json:"audience"`
+	TokenType                     string   `json:"token_type"`
+	TokenNumUses                  int64    `json:"token_num_uses"`
+	TokenNoDefaultPolicy          bool     `json:"token_no_default_policy"`
+	TokenExplicitMaxTTL           int64    `json:"token_explicit_max_ttl"`
+	TokenBoundCIDRs               []string `json:"token_bound_cidrs"`
 }
 
 // EffectivePolicies returns the policy list returned by the role endpoint.
@@ -51,6 +57,12 @@ type KubernetesAuthRoleRequest struct {
 	TokenTTL                      int64    `json:"token_ttl"`
 	TokenMaxTTL                   int64    `json:"token_max_ttl"`
 	TokenPeriod                   int64    `json:"token_period"`
+	Audience                      string   `json:"audience,omitempty"`
+	TokenType                     string   `json:"token_type,omitempty"`
+	TokenNumUses                  *int64   `json:"token_num_uses,omitempty"`
+	TokenNoDefaultPolicy          *bool    `json:"token_no_default_policy,omitempty"`
+	TokenExplicitMaxTTL           *int64   `json:"token_explicit_max_ttl,omitempty"`
+	TokenBoundCIDRs               []string `json:"token_bound_cidrs,omitempty"`
 }
 
 func kubernetesAuthRolePath(mountPath, name string) []string {

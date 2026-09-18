@@ -3,8 +3,9 @@
 ## Does this operator install OpenBao?
 
 No. It manages resources in an existing OpenBao instance. OpenBao deployment,
-storage, auth-method configuration, TokenReview credentials, and secret-engine
-configuration are outside the current scope.
+storage, HA, initialization, unseal, and server upgrades remain external. The
+operator can configure durable auth-method and secret-engine records through
+their CRDs after the server is available.
 
 ## Is this a Vault operator?
 
@@ -39,10 +40,16 @@ explicit.
 
 ## Does the operator manage AppRole configuration?
 
-No. OpenBao administrators or another credential process must configure the
-AppRole auth method, role, and Secret ID lifecycle. The operator only consumes
-the role ID and Secret ID from same-namespace Secrets and obtains a short-lived
-token.
+Yes, `OpenBaoAppRole` can manage the durable configuration of a role in an
+already enabled AppRole mount. OpenBao administrators or another credential
+process still own enabling the mount, issuing Role IDs and Secret IDs, and
+delivering or rotating those credentials. `OpenBaoConnection` consumes role ID
+and Secret ID values from same-namespace Secrets when it authenticates.
+
+## Does the operator manage secret values or generated credentials?
+
+No. It does not reconcile arbitrary secret-engine data, issue tokens or Secret
+IDs, or copy generated AppRole and OIDC client secrets to Kubernetes.
 
 ## Does deleting a Kubernetes resource delete OpenBao data?
 

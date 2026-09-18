@@ -2,7 +2,7 @@
 
 ## Context
 
-The primary actor is a platform operator who manages OpenBao configuration through Kubernetes. The current slice covers token-, Kubernetes-authenticated, and AppRole connections, ACL policy lifecycle, Kubernetes Auth role lifecycle inside preconfigured mounts, entity and group lifecycle, entity-alias binding, and explicit group membership claims.
+The primary actor is a platform operator who manages OpenBao entities and durable API configuration through Kubernetes. OpenBao is deployed separately and the operator is installed after the server is reachable. The current slice covers token-, Kubernetes-authenticated, and AppRole connections, ACL policy lifecycle, identity lifecycle, auth and secret-engine mount configuration, OIDC records, namespaces, audit devices, quotas, workflows, plugins, personas, MFA, system settings, and explicit ownership semantics.
 
 ## Current stories
 
@@ -174,6 +174,114 @@ Acceptance criteria:
 
 Design criteria: preconfigured auth-mount boundary, immutable connection and mount references, explicit create/adopt and deletion policy, normalized set comparison, whole-second OpenBao duration encoding, native OpenBao ACL authorization, no credential status, and focused live tenant-boundary verification.
 
+### US-013 — Manage durable OpenBao configuration
+
+As a platform operator, I want to declare durable OpenBao API configuration as
+Kubernetes resources, so that mounts, namespaces, audit devices, quotas,
+workflows, and plugin registrations are versioned and drift-corrected without
+making the operator responsible for deploying OpenBao.
+
+Acceptance criteria:
+
+- Given a reachable OpenBao instance and an authorized connection, when an
+  `OpenBaoAuthMethod` or `OpenBaoSecretEngine` is declared, then the selected
+  mount is enabled, tuned, and represented in status.
+- Given a named namespace, audit device, rate-limit quota, workflow, or plugin
+  registration, when its resource is reconciled, then the corresponding native
+  OpenBao endpoint is read and written through a typed client.
+- Given an existing object and `creationPolicy=Create`, then reconciliation
+  reports a conflict without overwriting it; explicit adoption permits
+  management.
+- Given external drift, when the next drift check runs, then the declared
+  durable fields are restored; unrelated fields are not silently claimed.
+- Given `deletionPolicy=Orphan`, the external object remains; given
+  `deletionPolicy=Delete`, the object is removed before the finalizer is
+  released.
+- Given an unavailable connection during cleanup, the finalizer is retained
+  and cleanup is retried after the dependency returns.
+
+Design criteria: OpenBao-native permissions, same-namespace connection
+references, typed HTTP contracts, explicit blast-radius defaults, focused
+unit and HTTP contract tests, and no server workload or storage ownership.
+
+### US-014 — Configure OpenBao identity authentication records
+
+As a platform operator, I want to declare token roles, AppRole roles,
+password policies, group aliases, and OIDC records, so that OpenBao identity
+configuration is managed with the same ownership and drift guarantees as
+entities and policies.
+
+Acceptance criteria:
+
+- Each resource maps to the appropriate named OpenBao endpoint and records a
+  stable name or configuration hash in status.
+- OIDC clients and AppRole resources configure roles without issuing or
+  synchronizing Secret IDs, client secrets, tokens, or passwords.
+- Group aliases validate the referenced group boundary and do not claim
+  membership synchronization from an external identity provider.
+- Existing records require explicit adoption, drift is corrected, and delete
+  behavior follows the declared policy.
+- All credential-bearing responses are excluded from status, logs, samples,
+  and test fixtures.
+
+Design criteria: native OpenBao identity semantics, typed resource-specific
+fields, external credential-delivery boundaries, and no generic arbitrary-path
+escape hatch.
+
+### US-015 — Install after OpenBao without owning the server
+
+As a platform operator, I want to install the operator independently of
+OpenBao's deployment lifecycle, so that OpenBao can be provisioned by the
+platform's chosen StatefulSet, Helm chart, or managed service.
+
+Acceptance criteria:
+
+- Documentation clearly requires a reachable existing OpenBao instance before
+  operator installation.
+- The chart and controller do not create OpenBao workloads, Services, storage,
+  TLS server configuration, Raft membership, initialization, or unseal state.
+- The Kind workflow provisions OpenBao as a test fixture and installs the
+  operator separately.
+- Connection readiness and dependent resource conditions explain failures when
+  OpenBao is unavailable, sealed, or unauthorized.
+
+Design criteria: independent lifecycle ownership, explicit connection
+boundary, and live tests focused on operator behavior rather than testing
+OpenBao's own deployment implementation.
+
+### US-016 — Reconcile the remaining durable OpenBao configuration
+
+As a platform operator, I want to manage the durable OpenBao API records that
+affect identity security and server behavior, so that an existing OpenBao
+instance can be configured comprehensively without an arbitrary-path escape
+hatch.
+
+Acceptance criteria:
+
+- Given an authorized connection, `OpenBaoPersona` manages a stable persona ID
+  and corrects mutable persona fields without replacing the persona identity.
+- Given an authorized connection, `OpenBaoMFAMethod` manages Duo, Okta, PingID,
+  and TOTP provider configuration, and `OpenBaoMFALoginEnforcement` manages
+  method associations.
+- MFA credential inputs are read only from same-namespace Secrets, trigger
+  reconciliation when rotated, are hashed rather than persisted in status,
+  and are never emitted in errors or logs.
+- CORS, audit request headers, UI headers, logger levels, global quota
+  settings, and automatic encryption/keyring rotation settings have typed CRDs,
+  clients, controllers, generated artifacts, and documented deletion
+  semantics.
+- Automatic-rotation resources configure future rotation only; they do not
+  invoke immediate rotation endpoints or generate credentials.
+- HTTP contract and controller unit tests cover route mapping, desired-field
+  drift, dependency failure, secret rotation, and no-delete singleton
+  behavior. Live tests remain focused on operator installation and a small
+  number of representative durable resources.
+
+Design criteria: use the OpenBao-native permission model, preserve the
+external-server lifecycle boundary, keep secret-bearing and one-shot routes
+outside reconciliation, and prefer resource-specific typed contracts over a
+generic raw API.
+
 ## Design alternatives and recommendation
 
 | Story | Status | Narrow typed HTTP client + explicit CRDs | Full OpenBao SDK + generic resource layer | Notes |
@@ -190,6 +298,10 @@ Design criteria: preconfigured auth-mount boundary, immutable connection and mou
 | US-010 | Current | Covered now | Covered now | AppRole extends the connection boundary with lazy credential sources and shared token lease handling |
 | US-011 | Current slice | Covered now | Covered now | `watchNamespaces`, scoped Helm RoleBindings, the tenant-author RBAC profile, platform-owned connections, OpenBao namespaces, and the two-tenant Kind scenario cover the supported model |
 | US-012 | Current | Covered now | Supported later | The role endpoint is a narrow typed extension; mount enablement and TokenReview configuration remain outside the operator, and OpenBao ACLs provide the runtime authorization boundary |
+| US-013 | Current | Covered now | Covered now | Durable system records use typed OpenBao endpoints and safe ownership defaults; server deployment remains external |
+| US-014 | Current | Covered now | Covered now | Identity configuration is broad, while generated credentials and one-shot flows remain explicitly external |
+| US-015 | Current | Covered now | Covered now | The operator connects to an existing OpenBao fixture or deployment and never owns its Kubernetes workload |
+| US-016 | Current | Covered now | Supported later | Durable persona, MFA, and system configuration use typed contracts; secret generation, immediate rotation, and other one-shot operations remain external |
 
 Recommend the narrow typed HTTP client with explicit CRDs. It covers the current stories with a small reviewable surface, keeps token handling and deletion semantics visible, and supports future OpenBao-native resources incrementally. The deliberate limitation is that each future endpoint needs a typed contract and focused tests; that cost is preferable to an arbitrary-path API whose safety is difficult to prove.
 

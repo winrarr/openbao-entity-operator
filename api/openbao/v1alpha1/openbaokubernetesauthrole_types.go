@@ -82,6 +82,32 @@ type OpenBaoKubernetesAuthRoleSpec struct {
 	// TokenPeriod gives issued tokens a fixed renewable period. A zero or omitted value disables it.
 	// +optional
 	TokenPeriod *metav1.Duration `json:"tokenPeriod,omitempty"`
+
+	// Audience restricts login JWTs to the configured Kubernetes audience.
+	// +optional
+	Audience string `json:"audience,omitempty"`
+
+	// TokenType selects the type of token issued by the role.
+	// +optional
+	// +kubebuilder:validation:Enum=service;batch
+	TokenType string `json:"tokenType,omitempty"`
+
+	// TokenNumUses limits how many times an issued token may be used. Zero means unlimited.
+	// +optional
+	TokenNumUses *int64 `json:"tokenNumUses,omitempty"`
+
+	// TokenNoDefaultPolicy prevents OpenBao from adding the default policy to issued tokens.
+	// +optional
+	TokenNoDefaultPolicy *bool `json:"tokenNoDefaultPolicy,omitempty"`
+
+	// TokenExplicitMaxTTL gives issued tokens an explicit maximum TTL.
+	// +optional
+	TokenExplicitMaxTTL *metav1.Duration `json:"tokenExplicitMaxTTL,omitempty"`
+
+	// TokenBoundCIDRs restricts issued tokens to these client address ranges.
+	// +listType=set
+	// +optional
+	TokenBoundCIDRs []string `json:"tokenBoundCIDRs,omitempty"`
 }
 
 // OpenBaoKubernetesAuthRoleStatus defines the observed state of an OpenBao

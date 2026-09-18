@@ -40,5 +40,6 @@ platform-owned. The default role deletion policy is Orphan.
   runtime dependency.
 - A platform must still bootstrap and operate the Kubernetes Auth mount before
   a role resource can become Ready.
-- Future auth-method configuration resources would need a separate design and
-  should not be smuggled into this role API.
+- Auth-method configuration is represented by the separate `OpenBaoAuthMethod`
+  resource. It remains separate from this role API because mount enablement and
+  workload role binding have different ownership and blast-radius semantics.

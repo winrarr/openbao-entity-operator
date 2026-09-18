@@ -424,29 +424,21 @@ func newTestClient(objects ...client.Object) client.Client {
 		panic(err)
 	}
 	for _, object := range objects {
-		switch typedObject := object.(type) {
-		case *openbaov1alpha1.OpenBaoConnection:
-			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoConnection"}
-		case *openbaov1alpha1.OpenBaoEntity:
-			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoEntity"}
-		case *openbaov1alpha1.OpenBaoEntityAlias:
-			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoEntityAlias"}
-		case *openbaov1alpha1.OpenBaoGroup:
-			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoGroup"}
-		case *openbaov1alpha1.OpenBaoGroupMembership:
-			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoGroupMembership"}
-		case *openbaov1alpha1.OpenBaoPolicy:
-			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoPolicy"}
-		case *openbaov1alpha1.OpenBaoKubernetesAuthRole:
-			typedObject.TypeMeta = metav1.TypeMeta{APIVersion: openbaov1alpha1.SchemeGroupVersion.String(), Kind: "OpenBaoKubernetesAuthRole"}
+		gvks, _, err := scheme.ObjectKinds(object)
+		if err != nil || len(gvks) == 0 {
+			if err == nil {
+				err = fmt.Errorf("no registered GVK for %T", object)
+			}
+			panic(err)
 		}
+		object.GetObjectKind().SetGroupVersionKind(gvks[0])
 	}
 	runtimeObjects := make([]runtime.Object, 0, len(objects))
 	for _, object := range objects {
 		runtimeObjects = append(runtimeObjects, object)
 	}
 	result := fake.NewClientBuilder().WithScheme(scheme).
-		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}, &openbaov1alpha1.OpenBaoGroup{}, &openbaov1alpha1.OpenBaoGroupMembership{}, &openbaov1alpha1.OpenBaoPolicy{}, &openbaov1alpha1.OpenBaoKubernetesAuthRole{}).
+		WithStatusSubresource(&openbaov1alpha1.OpenBaoConnection{}, &openbaov1alpha1.OpenBaoEntity{}, &openbaov1alpha1.OpenBaoEntityAlias{}, &openbaov1alpha1.OpenBaoGroup{}, &openbaov1alpha1.OpenBaoGroupMembership{}, &openbaov1alpha1.OpenBaoPolicy{}, &openbaov1alpha1.OpenBaoKubernetesAuthRole{}, &openbaov1alpha1.OpenBaoGroupAlias{}, &openbaov1alpha1.OpenBaoTokenRole{}, &openbaov1alpha1.OpenBaoPasswordPolicy{}, &openbaov1alpha1.OpenBaoAppRole{}, &openbaov1alpha1.OpenBaoAuthMethod{}, &openbaov1alpha1.OpenBaoSecretEngine{}, &openbaov1alpha1.OpenBaoNamespace{}, &openbaov1alpha1.OpenBaoAuditDevice{}, &openbaov1alpha1.OpenBaoRateLimitQuota{}, &openbaov1alpha1.OpenBaoWorkflow{}, &openbaov1alpha1.OpenBaoPlugin{}, &openbaov1alpha1.OpenBaoOIDCConfig{}, &openbaov1alpha1.OpenBaoOIDCProvider{}, &openbaov1alpha1.OpenBaoOIDCClient{}, &openbaov1alpha1.OpenBaoOIDCKey{}, &openbaov1alpha1.OpenBaoOIDCRole{}, &openbaov1alpha1.OpenBaoOIDCScope{}, &openbaov1alpha1.OpenBaoOIDCAssignment{}, &openbaov1alpha1.OpenBaoPersona{}, &openbaov1alpha1.OpenBaoMFALoginEnforcement{}, &openbaov1alpha1.OpenBaoMFAMethod{}, &openbaov1alpha1.OpenBaoCORSConfiguration{}, &openbaov1alpha1.OpenBaoAuditRequestHeader{}, &openbaov1alpha1.OpenBaoUIHeader{}, &openbaov1alpha1.OpenBaoRateLimitQuotaConfiguration{}, &openbaov1alpha1.OpenBaoLogger{}, &openbaov1alpha1.OpenBaoEncryptionKeyConfiguration{}, &openbaov1alpha1.OpenBaoKeyringRotationConfiguration{}).
 		WithRuntimeObjects(runtimeObjects...).Build()
 	return result
 }

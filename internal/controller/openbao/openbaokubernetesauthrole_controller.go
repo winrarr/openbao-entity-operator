@@ -271,6 +271,14 @@ func desiredKubernetesAuthRoleRequest(role *openbaov1alpha1.OpenBaoKubernetesAut
 	if err != nil {
 		return openbaoclient.KubernetesAuthRoleRequest{}, err
 	}
+	tokenExplicitMaxTTL, err := durationSeconds(role.Spec.TokenExplicitMaxTTL, "tokenExplicitMaxTTL")
+	if err != nil {
+		return openbaoclient.KubernetesAuthRoleRequest{}, err
+	}
+	var tokenExplicitMaxTTLValue *int64
+	if role.Spec.TokenExplicitMaxTTL != nil {
+		tokenExplicitMaxTTLValue = &tokenExplicitMaxTTL
+	}
 	return openbaoclient.KubernetesAuthRoleRequest{
 		BoundServiceAccountNames:      names,
 		BoundServiceAccountNamespaces: namespaces,
@@ -278,6 +286,12 @@ func desiredKubernetesAuthRoleRequest(role *openbaov1alpha1.OpenBaoKubernetesAut
 		TokenTTL:                      tokenTTL,
 		TokenMaxTTL:                   tokenMaxTTL,
 		TokenPeriod:                   tokenPeriod,
+		Audience:                      strings.TrimSpace(role.Spec.Audience),
+		TokenType:                     strings.TrimSpace(role.Spec.TokenType),
+		TokenNumUses:                  role.Spec.TokenNumUses,
+		TokenNoDefaultPolicy:          role.Spec.TokenNoDefaultPolicy,
+		TokenExplicitMaxTTL:           tokenExplicitMaxTTLValue,
+		TokenBoundCIDRs:               normalizedRoleValuesForComparison(role.Spec.TokenBoundCIDRs),
 	}, nil
 }
 
@@ -290,11 +304,39 @@ func normalizedKubernetesAuthRoleRequest(role *openbaoclient.KubernetesAuthRole)
 		TokenTTL:                      role.TokenTTL,
 		TokenMaxTTL:                   role.TokenMaxTTL,
 		TokenPeriod:                   role.TokenPeriod,
+		Audience:                      role.Audience,
+		TokenType:                     role.TokenType,
+		TokenNumUses:                  &role.TokenNumUses,
+		TokenNoDefaultPolicy:          &role.TokenNoDefaultPolicy,
+		TokenExplicitMaxTTL:           &role.TokenExplicitMaxTTL,
+		TokenBoundCIDRs:               normalizedRoleValuesForComparison(role.TokenBoundCIDRs),
 	}
 }
 
 func kubernetesAuthRoleMatches(desired openbaoclient.KubernetesAuthRoleRequest, observed *openbaoclient.KubernetesAuthRole) bool {
-	return reflect.DeepEqual(desired, normalizedKubernetesAuthRoleRequest(observed))
+	normalized := normalizedKubernetesAuthRoleRequest(observed)
+	if !reflect.DeepEqual(desired.BoundServiceAccountNames, normalized.BoundServiceAccountNames) ||
+		!reflect.DeepEqual(desired.BoundServiceAccountNamespaces, normalized.BoundServiceAccountNamespaces) ||
+		!reflect.DeepEqual(desired.TokenPolicies, normalized.TokenPolicies) ||
+		desired.TokenTTL != normalized.TokenTTL || desired.TokenMaxTTL != normalized.TokenMaxTTL || desired.TokenPeriod != normalized.TokenPeriod {
+		return false
+	}
+	if desired.Audience != "" && desired.Audience != normalized.Audience {
+		return false
+	}
+	if desired.TokenType != "" && desired.TokenType != normalized.TokenType {
+		return false
+	}
+	if desired.TokenNumUses != nil && (normalized.TokenNumUses == nil || *desired.TokenNumUses != *normalized.TokenNumUses) {
+		return false
+	}
+	if desired.TokenNoDefaultPolicy != nil && (normalized.TokenNoDefaultPolicy == nil || *desired.TokenNoDefaultPolicy != *normalized.TokenNoDefaultPolicy) {
+		return false
+	}
+	if desired.TokenExplicitMaxTTL != nil && (normalized.TokenExplicitMaxTTL == nil || *desired.TokenExplicitMaxTTL != *normalized.TokenExplicitMaxTTL) {
+		return false
+	}
+	return len(desired.TokenBoundCIDRs) == 0 || reflect.DeepEqual(desired.TokenBoundCIDRs, normalized.TokenBoundCIDRs)
 }
 
 func observeKubernetesAuthRoleStatus(role *openbaov1alpha1.OpenBaoKubernetesAuthRole, observed *openbaoclient.KubernetesAuthRole, mountPath string) {

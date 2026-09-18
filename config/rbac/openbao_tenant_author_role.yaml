@@ -9,12 +9,40 @@ rules:
 - apiGroups:
   - openbao.openbao-operator.io
   resources:
+  - openbaoauditdevices
+  - openbaoauditrequestheaders
+  - openbaoapproles
+  - openbaoauthmethods
+  - openbaocorsconfigurations
+  - openbaoencryptionkeyconfigurations
   - openbaoentities
   - openbaoentityaliases
+  - openbaogroupaliases
   - openbaogroups
   - openbaogroupmemberships
-  - openbaopolicies
+  - openbaokeyringrotationconfigurations
+  - openbaonamespaces
   - openbaokubernetesauthroles
+  - openbaologgers
+  - openbaomfaloginenforcements
+  - openbaomfamethods
+  - openbaooidcassignments
+  - openbaooidcclients
+  - openbaooidcconfigs
+  - openbaooidckeys
+  - openbaooidcproviders
+  - openbaooidcroles
+  - openbaooidcscopes
+  - openbaopasswordpolicies
+  - openbaopersonas
+  - openbaoplugins
+  - openbaopolicies
+  - openbaoratelimitquotas
+  - openbaoratelimitquotaconfigurations
+  - openbaosecretengines
+  - openbaotokenroles
+  - openbaouiheaders
+  - openbaoworkflows
   verbs:
   - create
   - delete

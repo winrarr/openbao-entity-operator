@@ -185,6 +185,72 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaokubernetesauthrole")
 		os.Exit(1)
 	}
+	if err := (&openbaocontroller.OpenBaoTokenRoleReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaotokenrole")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoPasswordPolicyReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaopasswordpolicy")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoAppRoleReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoapprole")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoOIDCConfigReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaooidcconfig")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoOIDCProviderReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaooidcprovider")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoOIDCClientReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaooidcclient")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoOIDCKeyReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaooidckey")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoOIDCRoleReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaooidcrole")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoOIDCScopeReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaooidcscope")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoOIDCAssignmentReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaooidcassignment")
+		os.Exit(1)
+	}
 	if err := (&openbaocontroller.OpenBaoEntityReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
@@ -201,12 +267,128 @@ func main() {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoentityalias")
 		os.Exit(1)
 	}
+	if err := (&openbaocontroller.OpenBaoGroupAliasReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaogroupalias")
+		os.Exit(1)
+	}
 	if err := (&openbaocontroller.OpenBaoGroupReconciler{
 		Client:      mgr.GetClient(),
 		Scheme:      mgr.GetScheme(),
 		ClientCache: connectionClientCache,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaogroup")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoPersonaReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaopersona")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoMFALoginEnforcementReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaomfaloginenforcement")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoMFAMethodReconciler{
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaomfamethod")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoAuthMethodReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoauthmethod")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoSecretEngineReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaosecretengine")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoNamespaceReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaonamespace")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoAuditDeviceReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoauditdevice")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoRateLimitQuotaReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoratelimitquota")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoWorkflowReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoworkflow")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoPluginReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoplugin")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoCORSConfigurationReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaocorsconfiguration")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoAuditRequestHeaderReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoauditrequestheader")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoUIHeaderReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaouiheader")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoRateLimitQuotaConfigurationReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoratelimitquotaconfiguration")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoLoggerReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaologger")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoEncryptionKeyConfigurationReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaoencryptionkeyconfiguration")
+		os.Exit(1)
+	}
+	if err := (&openbaocontroller.OpenBaoKeyringRotationConfigurationReconciler{
+		Client: mgr.GetClient(), Scheme: mgr.GetScheme(), ClientCache: connectionClientCache,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "openbao-openbaokeyringrotationconfiguration")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

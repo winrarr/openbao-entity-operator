@@ -61,11 +61,11 @@ Goal: let platform operators declare the ServiceAccount bindings and token
 configuration of an OpenBao Kubernetes Auth role while keeping auth-mount
 enablement and TokenReview administration outside this operator.
 
-Rationale: workload authentication is a natural next resource after
-Kubernetes-authenticated connections, but the operator should not become a
-generic OpenBao configuration layer. A role-scoped CRD provides useful
+Rationale: workload authentication is a natural resource after
+Kubernetes-authenticated connections. A role-scoped CRD provides useful
 declarative lifecycle management while OpenBao ACLs remain the native
-authorization boundary.
+authorization boundary; the broader operator still uses typed resources
+rather than an unsafe arbitrary-path API.
 
 Constraints: support only the newest selected OpenBao release; keep the
 connection and mount path immutable; use explicit create/adopt and deletion
@@ -84,3 +84,40 @@ Acceptance criteria:
   tenant access to platform-owned connections or Secrets.
 - Unit, HTTP contract, generated-artifact, documentation, and focused Kind
   tests verify the feature.
+
+## BL-003: Complete the durable OpenBao configuration surface
+
+Status: complete for the selected OpenBao v2.6.2 API snapshot
+
+Goal: let platform operators declare durable OpenBao API configuration after
+OpenBao is deployed, including mount configuration, namespaces, audit devices,
+quotas, workflows, plugins, OIDC records, identity personas and MFA, and
+system-level configuration.
+
+Rationale: the project name describes operating OpenBao entities, not only
+identity entities. Durable configuration is part of operating an OpenBao
+instance and should not be excluded merely because it is outside the original
+identity slice.
+
+Constraints: use typed clients and resource-specific APIs; prefer native
+OpenBao permissions; default high-blast-radius resources to orphaning; do not
+deploy or own the OpenBao server; do not issue or synchronize credential
+material; and keep one-shot administrative and diagnostic endpoints out of
+the reconciliation model.
+
+Acceptance criteria:
+
+- CRDs and controllers cover auth methods, secret engines, namespaces, audit
+  devices, rate-limit quotas, workflows, plugin registrations, OIDC records,
+  token roles, AppRole roles, password policies, group aliases, personas, MFA
+  methods and login enforcement, CORS, audit request headers, UI headers,
+  logger levels, global quota configuration, and automatic rotation settings.
+- Each implemented endpoint has an injectable typed client and HTTP contract
+  coverage.
+- Each controller has explicit create/adopt, drift, deletion, status, and
+  connection-dependency behavior with focused unit coverage.
+- Generated CRDs, RBAC, chart assets, API reference, resource guides, and
+  user stories are current.
+- The product and architecture documentation state that OpenBao deployment and
+  server lifecycle are external, and the Kind workflow installs OpenBao as a
+  fixture before the operator.

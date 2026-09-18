@@ -58,6 +58,10 @@ spec:
           spec:
             description: spec defines the desired state of OpenBaoKubernetesAuthRole
             properties:
+              audience:
+                description: Audience restricts login JWTs to the configured Kubernetes
+                  audience.
+                type: string
               boundServiceAccountNames:
                 description: |-
                   BoundServiceAccountNames lists the Kubernetes ServiceAccounts allowed to use the role.
@@ -117,10 +121,30 @@ spec:
                   auth/ prefix. The mount must already be enabled and configured.
                 pattern: ^[^/[:space:]]+([/][^/[:space:]]+)*$
                 type: string
+              tokenBoundCIDRs:
+                description: TokenBoundCIDRs restricts issued tokens to these client
+                  address ranges.
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
+              tokenExplicitMaxTTL:
+                description: TokenExplicitMaxTTL gives issued tokens an explicit maximum
+                  TTL.
+                type: string
               tokenMaxTTL:
                 description: TokenMaxTTL is the maximum token lifetime. A zero or
                   omitted value uses OpenBao's default.
                 type: string
+              tokenNoDefaultPolicy:
+                description: TokenNoDefaultPolicy prevents OpenBao from adding the
+                  default policy to issued tokens.
+                type: boolean
+              tokenNumUses:
+                description: TokenNumUses limits how many times an issued token may
+                  be used. Zero means unlimited.
+                format: int64
+                type: integer
               tokenPeriod:
                 description: TokenPeriod gives issued tokens a fixed renewable period.
                   A zero or omitted value disables it.
@@ -135,6 +159,12 @@ spec:
               tokenTTL:
                 description: TokenTTL is the initial token lifetime. A zero or omitted
                   value uses OpenBao's default.
+                type: string
+              tokenType:
+                description: TokenType selects the type of token issued by the role.
+                enum:
+                - service
+                - batch
                 type: string
             required:
             - boundServiceAccountNames

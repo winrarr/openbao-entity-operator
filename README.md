@@ -1,16 +1,18 @@
 # OpenBao Entity Operator
 
-Kubernetes-native lifecycle management for OpenBao ACL policies and identity entities and groups.
+Kubernetes-native lifecycle management for entities and durable configuration in an existing OpenBao instance.
 
 [Documentation](https://winrarr.github.io/openbao-entity-operator/) · [GitHub repository](https://github.com/winrarr/openbao-entity-operator)
 
-The current vertical slice gives platform teams a declarative boundary around one OpenBao instance and its identity resources:
+The operator connects to an OpenBao instance that is deployed and operated separately. It gives platform teams a declarative boundary around OpenBao entities and durable API configuration:
 
 ```text
-Kubernetes Secret → OpenBaoConnection → OpenBaoPolicy / OpenBaoKubernetesAuthRole / OpenBaoEntity / OpenBaoGroup → membership claims
+Kubernetes Secret or ServiceAccount → OpenBaoConnection → OpenBaoPolicy / AuthMethod / SecretEngine / Entity / Group / OIDC / Workflow → OpenBao API
 ```
 
-The operator validates connectivity, reconciles named ACL policy documents and Kubernetes Auth roles, manages entity metadata, policies, and disabled state, binds auth-method aliases to entities, manages internal groups and explicit membership edges, reports stable external IDs in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
+The operator validates connectivity, reconciles durable OpenBao API configuration, manages ACL policies and authentication roles, manages entities, aliases, groups, OIDC configuration, namespaces, audit devices, quotas, workflows, and plugin registrations, reports observed identifiers and hashes in status, detects drift, and makes external deletion an explicit choice. It is OpenBao-focused; Vault compatibility is not a project promise.
+
+OpenBao deployment is intentionally outside the project. Install and operate OpenBao first, then install this operator and point an `OpenBaoConnection` at it. Storage, HA, initialization, unseal, upgrades, and server lifecycle remain the responsibility of the OpenBao deployment.
 
 ## Quick start
 

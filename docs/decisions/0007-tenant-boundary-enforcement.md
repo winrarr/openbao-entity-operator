@@ -29,8 +29,8 @@ The first tenant-boundary slice uses three platform-controlled layers:
    least-privilege ACL policy there, then authenticate the operator with a
    token, AppRole, or Kubernetes Auth role that is limited to that namespace.
 3. The chart publishes an unbound tenant-author ClusterRole that grants CRUD
-   access to identity and policy resources only. Platform administrators bind
-   it per tenant namespace; tenant principals do not receive access to
+   access to supported entity and durable configuration resources. Platform
+   administrators bind it per tenant namespace; tenant principals do not receive access to
    OpenBaoConnection objects, connection subresources, or Secrets.
 
 The operator will not add Kyverno as a runtime dependency, create an OpenBao
@@ -51,8 +51,10 @@ and deletion policies.
   `OpenBaoConnection` objects or credential Secrets when the operator's
   external identity is platform-owned; use Kubernetes RBAC or admission policy
   for that authoring boundary.
-- OpenBao namespaces must exist and be permissioned outside this operator. The
-  operator deliberately does not manage their lifecycle.
+- OpenBao namespaces can be configured through `OpenBaoNamespace`, but the
+  OpenBao server and the platform's permission to create child namespaces
+  remain external. Native OpenBao ACLs must constrain which namespace paths a
+  tenant-authorized connection may mutate.
 - The local Kind workflow verifies two tenant ServiceAccounts, two
   platform-owned connections, two OpenBao namespaces, and cross-boundary
   denial in both Kubernetes and OpenBao.

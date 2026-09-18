@@ -7,14 +7,20 @@ Kubernetes API
     │
     ├── OpenBaoConnectionReconciler ──┐
     │                                 │
-    ├── OpenBaoPolicyReconciler ──────┤
-    ├── OpenBaoKubernetesAuthRole ────┤
-    ├── OpenBaoEntityReconciler ──────┤
-    ├── OpenBaoEntityAliasReconciler ─┤
-    └── OpenBaoGroupReconciler ──────┼── internal/openbaoclient ── OpenBao HTTP API
+    ├── OpenBaoPolicy / auth roles ───┤
+    ├── OpenBaoEntity / aliases ─────┤
+    ├── OpenBaoGroup / memberships ──┤
+    ├── OpenBaoOIDC resources ───────┤
+    └── OpenBao system resources ────┼── internal/openbaoclient ── OpenBao HTTP API
                                       │
                   same-namespace Secret or projected ServiceAccount JWT
 ```
+
+The operator assumes the OpenBao API is already available. It is not a
+deployment controller: there is no ownership relationship with an OpenBao
+Pod, workload, Service, storage volume, Raft cluster, or installation chart.
+The OpenBao deployment supplies the server lifecycle; these reconcilers supply
+durable API configuration and identity entities after the server exists.
 
 The API types and Kubebuilder markers under `api/openbao/v1alpha1` are authoritative. CRDs and deepcopy methods are derived with `make manifests generate`. The OpenAPI file under `hack/` is external reference material only.
 
@@ -85,6 +91,28 @@ native OpenBao permissions without adding a Kyverno runtime dependency.
 OpenBao exposes membership as arrays on the group update API rather than as independent membership endpoints. The controller therefore reads the current group, removes only membership IDs previously tracked as operator-managed, adds current claims, and writes the resulting arrays. Remote members that were never claimed remain intact. Membership status records the parent and member IDs; deleting a membership claim removes only that edge and never deletes the group or entity.
 
 Deletion is safe by default: `Orphan` removes the Kubernetes finalizer without calling OpenBao. `Delete` adds a finalizer before external mutation and removes it only after the OpenBao object is deleted or already absent. If the connection or its credential Secret disappears first, the controller retains the finalizer, records `CleanupRequired=True` and `Stalled=True`, and retries until the dependency is restored. This preserves recoverable external cleanup instead of silently orphaning the object; manual finalizer removal remains an administrative override.
+
+## Durable configuration flow
+
+The configuration reconcilers use the same connection, ownership, status, and
+drift machinery as the identity reconcilers, but each is backed by a named
+OpenBao API object or configuration record:
+
+- `OpenBaoAuthMethod` and `OpenBaoSecretEngine` enable and tune OpenBao mount
+  types. They do not install plugin binaries or manage secret data.
+- `OpenBaoNamespace` manages namespace metadata. The server and its namespace
+  feature must already be available.
+- `OpenBaoAuditDevice`, `OpenBaoRateLimitQuota`, and `OpenBaoWorkflow` manage
+  durable system records through their native endpoints.
+- `OpenBaoPlugin` manages a catalog registration only; the plugin artifact and
+  its execution environment remain external.
+- OIDC resources manage identity OIDC configuration records. The controller
+  does not expose generated client secrets or execute login/token flows.
+
+The typed clients intentionally do not provide arbitrary path access. A new
+OpenBao endpoint is added as a typed resource only when its desired state is
+durable, its read/write behavior can be tested, and its credential or
+one-shot-operation semantics are safe for reconciliation.
 
 ## Extension boundary
 

@@ -2,13 +2,41 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
+- bases/openbao.openbao-operator.io_openbaoapproles.yaml
+- bases/openbao.openbao-operator.io_openbaoauditdevices.yaml
+- bases/openbao.openbao-operator.io_openbaoauditrequestheaders.yaml
+- bases/openbao.openbao-operator.io_openbaoauthmethods.yaml
 - bases/openbao.openbao-operator.io_openbaoconnections.yaml
 - bases/openbao.openbao-operator.io_openbaoentities.yaml
 - bases/openbao.openbao-operator.io_openbaoentityaliases.yaml
+- bases/openbao.openbao-operator.io_openbaogroupaliases.yaml
 - bases/openbao.openbao-operator.io_openbaogroups.yaml
 - bases/openbao.openbao-operator.io_openbaogroupmemberships.yaml
+- bases/openbao.openbao-operator.io_openbaocorsconfigurations.yaml
+- bases/openbao.openbao-operator.io_openbaoencryptionkeyconfigurations.yaml
+- bases/openbao.openbao-operator.io_openbaokeyringrotationconfigurations.yaml
+- bases/openbao.openbao-operator.io_openbaologgers.yaml
+- bases/openbao.openbao-operator.io_openbaomfaloginenforcements.yaml
+- bases/openbao.openbao-operator.io_openbaomfamethods.yaml
+- bases/openbao.openbao-operator.io_openbaonamespaces.yaml
+- bases/openbao.openbao-operator.io_openbaooidcassignments.yaml
+- bases/openbao.openbao-operator.io_openbaooidcclients.yaml
+- bases/openbao.openbao-operator.io_openbaooidcconfigs.yaml
+- bases/openbao.openbao-operator.io_openbaooidckeys.yaml
+- bases/openbao.openbao-operator.io_openbaooidcproviders.yaml
+- bases/openbao.openbao-operator.io_openbaooidcroles.yaml
+- bases/openbao.openbao-operator.io_openbaooidcscopes.yaml
+- bases/openbao.openbao-operator.io_openbaopasswordpolicies.yaml
+- bases/openbao.openbao-operator.io_openbaopersonas.yaml
+- bases/openbao.openbao-operator.io_openbaoplugins.yaml
 - bases/openbao.openbao-operator.io_openbaopolicies.yaml
 - bases/openbao.openbao-operator.io_openbaokubernetesauthroles.yaml
+- bases/openbao.openbao-operator.io_openbaoratelimitquotas.yaml
+- bases/openbao.openbao-operator.io_openbaoratelimitquotaconfigurations.yaml
+- bases/openbao.openbao-operator.io_openbaosecretengines.yaml
+- bases/openbao.openbao-operator.io_openbaotokenroles.yaml
+- bases/openbao.openbao-operator.io_openbaouiheaders.yaml
+- bases/openbao.openbao-operator.io_openbaoworkflows.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
