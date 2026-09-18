@@ -45,6 +45,7 @@ GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 OPENBAO_OPENAPI_SPEC ?= hack/openbao-openapi.json
 OPENBAO_ADDR ?= http://127.0.0.1:8200
 OPENBAO_TOKEN ?=
+RELEASE_TAG ?=
 
 GO_TOOLCHAIN ?= go1.27.1
 GO := GOTOOLCHAIN=$(GO_TOOLCHAIN) go
@@ -126,6 +127,11 @@ helm-template: ## Render the operator Helm chart.
 .PHONY: openapi-check
 openapi-check: ## Validate the checked-in OpenBao OpenAPI reference.
 	OPENBAO_OPENAPI_SPEC="$(OPENBAO_OPENAPI_SPEC)" ./hack/check-openbao-openapi.sh
+
+.PHONY: validate-release
+validate-release: ## Validate release tag and chart metadata.
+	@test -n "$(RELEASE_TAG)" || { echo "Set RELEASE_TAG, for example RELEASE_TAG=v0.1.0" >&2; exit 1; }
+	RELEASE_TAG="$(RELEASE_TAG)" ./hack/validate-release.sh >/dev/null
 
 .PHONY: shell-check
 shell-check: ## Validate repository shell scripts parse successfully.
