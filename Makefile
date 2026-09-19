@@ -108,6 +108,9 @@ vet: ## Run go vet.
 test: manifests generate format-check vet ## Run unit tests.
 	$(GO) test ./... -coverprofile=cover.out
 
+.PHONY: conformance
+conformance: test samples-check ## Run the unit and sample conformance suite.
+
 .PHONY: lint-config
 lint-config: golangci-lint ## Validate the linter configuration.
 	"$(GOLANGCI_LINT)" config verify
@@ -146,6 +149,10 @@ update-openbao-openapi: ## Refresh the OpenBao OpenAPI reference from a running 
 kustomize-build: kustomize ## Render the default installation manifests.
 	"$(KUSTOMIZE)" build config/default >/dev/null
 
+.PHONY: samples-check
+samples-check: kustomize ## Render all repository samples.
+	"$(KUSTOMIZE)" build config/samples >/dev/null
+
 .PHONY: generate-api-reference
 generate-api-reference: crd-ref-docs ## Generate the CRD API reference.
 	@mkdir -p docs/reference
@@ -169,7 +176,7 @@ docs-serve: generate-api-reference ## Generate and serve the documentation site 
 	$(CONTAINER_TOOL) run --rm --workdir /docs -p 8000:8000 $(DOCS_CONTAINER_MOUNTS) $(DOCS_CONTAINER_IMAGE) serve --dev-addr 0.0.0.0:8000 --config-file $(DOCS_CONFIG)
 
 .PHONY: check
-check: manifests generate format-check shell-check vet test lint-config lint helm-lint helm-template openapi-check kustomize-build docs-build ## Run the complete local verification suite.
+check: manifests generate format-check shell-check vet conformance lint-config lint helm-lint helm-template openapi-check kustomize-build samples-check docs-build ## Run the complete local verification suite.
 
 ##@ Build
 

@@ -26,6 +26,7 @@ nav = [
     { "Examples" = [
       { "Overview" = "examples/index.md" },
       { "Connection and Identity" = "examples/connection-and-identity.md" },
+      { "Durable Configuration" = "examples/durable-configuration.md" },
     ] },
   ] },
   { "Resource Guides" = [
@@ -37,6 +38,9 @@ nav = [
     { "OpenBaoEntityAlias" = "crds/openbao-entity-alias.md" },
     { "OpenBaoGroup" = "crds/openbao-group.md" },
     { "OpenBaoGroupMembership" = "crds/openbao-group-membership.md" },
+    { "Identity and MFA Configuration" = "crds/openbao-identity-configuration.md" },
+    { "OIDC Configuration" = "crds/openbao-oidc.md" },
+    { "OpenBao Configuration" = "crds/openbao-configuration.md" },
   ] },
   { "Product" = [
     { "Product Scope" = "product.md" },

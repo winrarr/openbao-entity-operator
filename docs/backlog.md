@@ -121,3 +121,35 @@ Acceptance criteria:
 - The product and architecture documentation state that OpenBao deployment and
   server lifecycle are external, and the Kind workflow installs OpenBao as a
   fixture before the operator.
+
+## BL-004: Make the broad API surface conformance-tested
+
+Status: complete for the v0.2 hardening pass
+
+Goal: make the behavior of the existing resource families easy to verify and
+extend without turning the live Kind workflow into a second controller test
+suite.
+
+Rationale: the operator now covers a broad OpenBao API surface. A small set of
+representative controller tests and a rendered sample bundle provide a more
+useful maintenance boundary than duplicating every state-machine branch in
+shell-based E2E tests.
+
+Constraints: keep controller logic in fake-client and HTTP contract tests;
+reserve Kind for Kubernetes/OpenBao wiring, installation, authentication, and
+the few external behaviors that unit tests cannot observe; use reusable
+fixtures and table-driven tests; keep samples credential-free and safe to
+review; and keep the newest-stable OpenBao compatibility policy unchanged.
+
+Acceptance criteria:
+
+- Shared system-resource lifecycle behavior covers creation, drift correction,
+  adoption, orphan deletion, and dependency-loss cleanup.
+- OIDC resource adapters and configuration cover their typed write paths,
+  drift correction, and adoption behavior through injectable clients.
+- Specialized identity configuration tests cover normalization, stable
+  external identity protection, and content-based status hashing.
+- `make samples-check` renders grouped identity, OIDC, and system samples, and
+  `make conformance` runs the local suite together with sample validation.
+- Documentation explains the sample bundles and preserves the test pyramid:
+  unit and HTTP tests carry controller behavior while Kind remains lean.

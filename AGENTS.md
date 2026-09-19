@@ -41,12 +41,14 @@ This is a Go 1.27 Kubernetes operator for durable entities and API configuration
 ```sh
 make check             # Generate, format-check, vet, test, lint, validate OpenAPI, render Kustomize
 make test              # Focused local unit tests
+make conformance       # Run unit/HTTP contracts and render every sample bundle
 make manifests generate
 make verify-generated  # Regenerate and compare tracked generated output
 make build             # Build bin/manager
 make build-installer   # Write dist/install.yaml
 make run               # Run against the current kubeconfig context
 make openapi-check     # Validate the checked-in OpenBao API reference
+make samples-check     # Render every repository sample bundle
 make docs-build        # Generate the CRD reference and build the strict docs site
 make docs-serve        # Serve the docs site locally on localhost:8000
 make kind-e2e          # Run live OpenBao/Kubernetes scenarios in Kind

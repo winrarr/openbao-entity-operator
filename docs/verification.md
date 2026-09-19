@@ -9,6 +9,8 @@
 | `make manifests generate` | CRDs, RBAC, and deepcopy output can be regenerated | Does not prove generated output was committed |
 | `make verify-generated` | Tracked generated output has no regeneration diff | Requires a Git checkout and compares only the protected paths |
 | `make test` | Typed OpenBao HTTP contracts, authentication login/renew/re-login, policy and role lifecycle, system-resource lifecycle, and identity reconciliation transitions pass unit tests | Does not exercise a live Kubernetes API server or OpenBao |
+| `make samples-check` | Every checked-in sample bundle renders through Kustomize | Does not prove the sample can be applied to a live OpenBao instance |
+| `make conformance` | Runs the full unit/HTTP contract suite and validates all sample bundles | Does not exercise a live Kubernetes API server or OpenBao |
 | `make lint-config lint` | Linter configuration and source checks pass | Linter findings are not a substitute for runtime tests |
 | `make openapi-check` | The checked-in OpenBao reference is valid and contains the selected durable OpenBao API families used here | The reference is version-specific and dynamic |
 | `make kustomize-build` | The default installation manifests render | Does not apply them to a cluster |

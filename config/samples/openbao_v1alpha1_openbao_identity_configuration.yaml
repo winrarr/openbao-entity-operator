@@ -1,0 +1,91 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoGroupAlias
+metadata:
+  name: platform-from-idp
+spec:
+  connectionRef:
+    name: openbao
+  groupRef:
+    name: platform
+  mountAccessor: auth_oidc_accessor
+  name: platform
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoTokenRole
+metadata:
+  name: payments-token
+spec:
+  connectionRef:
+    name: openbao
+  allowedPolicies:
+    - payments-read
+  tokenType: service
+  tokenPeriod: 1h
+  tokenNoDefaultPolicy: true
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoAppRole
+metadata:
+  name: payments
+spec:
+  connectionRef:
+    name: openbao
+  bindSecretID: true
+  tokenPolicies:
+    - payments-read
+  tokenTTL: 1h
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPasswordPolicy
+metadata:
+  name: enterprise
+spec:
+  connectionRef:
+    name: openbao
+  rules: |
+    length = 20
+    rule "charset" {
+      charset = "abcdefghijklmnopqrstuvwxyz"
+      min-chars = 2
+    }
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPersona
+metadata:
+  name: payments-persona
+spec:
+  connectionRef:
+    name: openbao
+  name: payments
+  entityID: entity-id-from-openbao
+  mountAccessor: auth_kubernetes_accessor
+  metadata:
+    team: payments
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoMFAMethod
+metadata:
+  name: login-totp
+spec:
+  connectionRef:
+    name: openbao
+  type: totp
+  methodID: login-totp
+  methodName: login-totp
+  issuer: example
+  algorithm: SHA256
+  digits: 6
+  period: 30
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoMFALoginEnforcement
+metadata:
+  name: payments-login
+spec:
+  connectionRef:
+    name: openbao
+  name: payments-login
+  authMethodTypes:
+    - kubernetes
+  mfaMethodIDs:
+    - login-totp

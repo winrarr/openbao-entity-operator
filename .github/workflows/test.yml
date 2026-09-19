@@ -32,4 +32,4 @@ jobs:
           go-version-file: go.mod
 
       - name: Running Tests
-        run: make verify-generated test openapi-check kustomize-build helm-lint helm-template
+        run: make verify-generated conformance openapi-check kustomize-build helm-lint helm-template

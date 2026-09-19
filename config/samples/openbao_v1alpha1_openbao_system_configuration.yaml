@@ -1,0 +1,161 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoAuthMethod
+metadata:
+  name: kubernetes
+spec:
+  connectionRef:
+    name: openbao
+  path: kubernetes
+  type: kubernetes
+  defaultLeaseTTL: 1h
+  maxLeaseTTL: 24h
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoSecretEngine
+metadata:
+  name: payments
+spec:
+  connectionRef:
+    name: openbao
+  path: payments
+  type: kv
+  options:
+    version: "2"
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoNamespace
+metadata:
+  name: platform-production
+spec:
+  connectionRef:
+    name: root-openbao
+  path: platform/production
+  customMetadata:
+    owner: platform
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoAuditDevice
+metadata:
+  name: file
+spec:
+  connectionRef:
+    name: openbao
+  path: file
+  type: file
+  options:
+    file_path: /var/log/openbao/audit.log
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoRateLimitQuota
+metadata:
+  name: payments
+spec:
+  connectionRef:
+    name: openbao
+  type: path
+  path: payments
+  rate: "10"
+  interval: 1s
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoWorkflow
+metadata:
+  name: payments-rotation
+spec:
+  connectionRef:
+    name: openbao
+  path: payments/rotation
+  workflow: |
+    # OpenBao workflow definition
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoPlugin
+metadata:
+  name: payments-plugin
+spec:
+  connectionRef:
+    name: openbao
+  name: payments-plugin
+  type: secret
+  command: openbao-plugin-payments
+  sha256: 0000000000000000000000000000000000000000000000000000000000000000
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoCORSConfiguration
+metadata:
+  name: cors
+spec:
+  connectionRef:
+    name: openbao
+  enable: true
+  allowCredentials: false
+  allowedOrigins:
+    - https://payments.example.com
+  allowedHeaders:
+    - Authorization
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoAuditRequestHeader
+metadata:
+  name: request-id
+spec:
+  connectionRef:
+    name: openbao
+  header: X-Request-ID
+  hmac: true
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoUIHeader
+metadata:
+  name: frame-options
+spec:
+  connectionRef:
+    name: openbao
+  header: X-Frame-Options
+  values:
+    - DENY
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoRateLimitQuotaConfiguration
+metadata:
+  name: global-quota
+spec:
+  connectionRef:
+    name: openbao
+  enableRateLimitAuditLogging: true
+  enableRateLimitResponseHeaders: true
+  rateLimitExemptPaths:
+    - sys/health
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoLogger
+metadata:
+  name: audit-logger
+spec:
+  connectionRef:
+    name: openbao
+  name: audit
+  level: info
+  creationPolicy: Adopt
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoEncryptionKeyConfiguration
+metadata:
+  name: encryption-rotation
+spec:
+  connectionRef:
+    name: openbao
+  enabled: true
+  interval: 720h
+  maxOperations: 1000
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoKeyringRotationConfiguration
+metadata:
+  name: keyring-rotation
+spec:
+  connectionRef:
+    name: openbao
+  enabled: true
+  interval: 720h
+  maxOperations: 1000
