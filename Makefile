@@ -2,56 +2,7 @@ SHELL := /usr/bin/env bash
 .SHELLFLAGS := -o pipefail -ec
 .DEFAULT_GOAL := help
 
-PROJECT_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-LOCALBIN ?= $(PROJECT_DIR)/bin
-
-IMG ?= ghcr.io/winrarr/openbao-entity-operator:dev
-CONTAINER_TOOL ?= docker
-DOCS_CONTAINER_IMAGE ?= zensical/zensical:0.0.59
-DOCS_CONTAINER_MOUNTS = -v "$(PROJECT_DIR)":/docs
-DOCS_CONFIG ?= zensical.toml
-KUBECTL ?= kubectl
-KIND ?= $(shell command -v kind 2>/dev/null || echo $(LOCALBIN)/kind)
-HELM ?= helm
-HELM_ARGS ?=
-HELM_CMD = $(HELM) $(HELM_ARGS)
-HELM_INSTALL_ARGS ?=
-PROJECT_NAME ?= openbao-entity-operator
-CHART_DIR ?= charts/openbao-entity-operator
-KIND_CLUSTER ?= openbao-entity-operator
-KIND_CNI ?= default
-KIND_NODE_IMAGE ?= kindest/node:v1.34.2
-OPENBAO_IMAGE ?= openbao/openbao:2.6.2
-OPENBAO_NAMESPACE ?= openbao
-OPENBAO_TOKEN_SECRET ?= openbao-dev-token
-OPENBAO_TOKEN_KEY ?= token
-OPERATOR_NAMESPACE ?= openbao-entity-operator-system
-E2E_TEST_NAMESPACE ?= openbao-entity-operator-e2e
-E2E_TENANT_B_NAMESPACE ?= openbao-entity-operator-e2e-b
-E2E_OUTSIDE_NAMESPACE ?= openbao-entity-operator-outside
-PERSISTENT_OPENBAO_NAMESPACE ?= openbao-entity-operator-persistent
-PERSISTENT_OPENBAO_DEPLOYMENT ?= openbao-persistent
-PERSISTENT_OPENBAO_SERVICE ?= openbao-persistent
-PERSISTENT_OPENBAO_TLS_SECRET ?= openbao-persistent-tls
-PERSISTENT_OPENBAO_BOOTSTRAP_SECRET ?= openbao-persistent-bootstrap
-PERSISTENT_E2E_NAMESPACE ?= openbao-entity-operator-resilience
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
-CRD_REF_DOCS ?= $(LOCALBIN)/crd-ref-docs
-CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
-GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
-OPENBAO_OPENAPI_SPEC ?= hack/openbao-openapi.json
-OPENBAO_ADDR ?= http://127.0.0.1:8200
-OPENBAO_TOKEN ?=
-
-GO_TOOLCHAIN ?= go1.27.1
-GO := GOTOOLCHAIN=$(GO_TOOLCHAIN) go
-GOFMT := $(shell GOTOOLCHAIN=$(GO_TOOLCHAIN) go env GOROOT)/bin/gofmt
-KUSTOMIZE_VERSION ?= v5.8.0
-CRD_REF_DOCS_VERSION ?= v0.3.0
-CONTROLLER_TOOLS_VERSION ?= v0.22.0
-GOLANGCI_LINT_VERSION ?= v2.13.1
-KIND_VERSION ?= v0.30.0
-CILIUM_VERSION ?= v1.20.1
+include hack/make-config.mk
 
 ##@ Help
 
@@ -110,11 +61,11 @@ lint: golangci-lint
 
 .PHONY: helm-lint
 helm-lint:
-	$(HELM) lint $(CHART_DIR)
+	$(HELM) lint charts/$(PROJECT_NAME)
 
 .PHONY: helm-template
 helm-template:
-	$(HELM) template $(PROJECT_NAME) $(CHART_DIR) --namespace $(OPERATOR_NAMESPACE) --include-crds >/dev/null
+	$(HELM) template $(PROJECT_NAME) charts/$(PROJECT_NAME) --namespace $(OPERATOR_NAMESPACE) --include-crds >/dev/null
 
 .PHONY: openapi-check
 openapi-check:
@@ -146,17 +97,17 @@ generate-api-reference: crd-ref-docs
 
 .PHONY: build-docs-site
 build-docs-site: generate-api-reference
-	$(CONTAINER_TOOL) run --rm --workdir /docs $(DOCS_CONTAINER_MOUNTS) $(DOCS_CONTAINER_IMAGE) build --strict --config-file $(DOCS_CONFIG)
+	$(CONTAINER_TOOL) run --rm --workdir /docs -v "$(CURDIR)":/docs $(DOCS_CONTAINER_IMAGE) build --strict --config-file $(DOCS_CONFIG)
 
 .PHONY: docs-build
 docs-build: build-docs-site ## Generate the API reference and build the documentation site.
 
 .PHONY: docs-serve
 docs-serve: generate-api-reference ## Generate and serve the documentation site locally.
-	$(CONTAINER_TOOL) run --rm --workdir /docs -p 8000:8000 $(DOCS_CONTAINER_MOUNTS) $(DOCS_CONTAINER_IMAGE) serve --dev-addr 0.0.0.0:8000 --config-file $(DOCS_CONFIG)
+	$(CONTAINER_TOOL) run --rm --workdir /docs -p 8000:8000 -v "$(CURDIR)":/docs $(DOCS_CONTAINER_IMAGE) serve --dev-addr 0.0.0.0:8000 --config-file $(DOCS_CONFIG)
 
 .PHONY: check
-check: manifests generate format-check shell-check vet conformance lint-config lint helm-lint helm-template openapi-check samples-check docs-build ## Run the complete local verification suite.
+check: verify-generated shell-check conformance lint-config lint helm-lint helm-template openapi-check docs-build ## Run the complete local verification suite.
 
 ##@ Deployment
 
@@ -174,7 +125,7 @@ helm-install: helm-lint
 	if [[ "$$IMG_REF" == *@* ]]; then \
 		IMG_REPO="$${IMG_REF%@*}"; \
 		IMG_DIGEST="$${IMG_REF#*@}"; \
-		$(HELM_CMD) upgrade --install "$(PROJECT_NAME)" "$(CHART_DIR)" \
+		$(HELM) $(HELM_ARGS) upgrade --install "$(PROJECT_NAME)" charts/$(PROJECT_NAME) \
 			--namespace "$(OPERATOR_NAMESPACE)" --create-namespace \
 			--set-string "image.repository=$$IMG_REPO" --set-string "image.digest=$$IMG_DIGEST" --set-string image.tag="" \
 			$(HELM_INSTALL_ARGS) \
@@ -188,7 +139,7 @@ helm-install: helm-lint
 			IMG_REPO="$$IMG_REF"; \
 			IMG_TAG="latest"; \
 		fi; \
-		$(HELM_CMD) upgrade --install "$(PROJECT_NAME)" "$(CHART_DIR)" \
+		$(HELM) $(HELM_ARGS) upgrade --install "$(PROJECT_NAME)" charts/$(PROJECT_NAME) \
 			--namespace "$(OPERATOR_NAMESPACE)" --create-namespace \
 			--set-string "image.repository=$$IMG_REPO" --set-string "image.tag=$$IMG_TAG" \
 			$(HELM_INSTALL_ARGS) \
@@ -197,7 +148,7 @@ helm-install: helm-lint
 
 .PHONY: undeploy
 undeploy: ## Uninstall the operator Helm release.
-	$(HELM_CMD) uninstall "$(PROJECT_NAME)" --namespace "$(OPERATOR_NAMESPACE)" --ignore-not-found
+	$(HELM) $(HELM_ARGS) uninstall "$(PROJECT_NAME)" --namespace "$(OPERATOR_NAMESPACE)" --ignore-not-found
 
 ##@ Local Kind environment
 
@@ -279,10 +230,10 @@ kind-install-openbao: kind-install-cni kind-load-openbao-image
 	@if ! $(KUBECTL) --context="kind-$(KIND_CLUSTER)" -n "$(OPENBAO_NAMESPACE)" get secret "$(OPENBAO_TOKEN_SECRET)" >/dev/null 2>&1; then \
 		token="$$(openssl rand -hex 32)"; \
 		$(KUBECTL) --context="kind-$(KIND_CLUSTER)" -n "$(OPENBAO_NAMESPACE)" create secret generic "$(OPENBAO_TOKEN_SECRET)" \
-			--from-literal="$(OPENBAO_TOKEN_KEY)=$$token" --dry-run=client -o yaml | \
+			--from-literal=token="$$token" --dry-run=client -o yaml | \
 			$(KUBECTL) --context="kind-$(KIND_CLUSTER)" apply -f -; \
 	fi
-	OPENBAO_IMAGE="$(OPENBAO_IMAGE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" OPENBAO_TOKEN_SECRET="$(OPENBAO_TOKEN_SECRET)" OPENBAO_TOKEN_KEY="$(OPENBAO_TOKEN_KEY)" \
+	OPENBAO_IMAGE="$(OPENBAO_IMAGE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" OPENBAO_TOKEN_SECRET="$(OPENBAO_TOKEN_SECRET)" \
 		envsubst < hack/kind-openbao.yaml | $(KUBECTL) --context="kind-$(KIND_CLUSTER)" apply -f -
 	$(KUBECTL) --context="kind-$(KIND_CLUSTER)" -n "$(OPENBAO_NAMESPACE)" rollout status deployment/openbao --timeout=5m
 
@@ -307,7 +258,7 @@ kind-deploy-e2e: kind-deploy
 kind-e2e: ## Run the live OpenBao reconciliation workflow in Kind.
 	$(MAKE) kind-deploy-e2e
 	KEEP_TEST_RESOURCES=true KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" TENANT_B_NAMESPACE="$(E2E_TENANT_B_NAMESPACE)" OUTSIDE_NAMESPACE="$(E2E_OUTSIDE_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
-		OPENBAO_TOKEN_SECRET="$(OPENBAO_TOKEN_SECRET)" OPENBAO_TOKEN_KEY="$(OPENBAO_TOKEN_KEY)" OPERATOR_NAMESPACE="$(OPERATOR_NAMESPACE)" \
+		OPENBAO_TOKEN_SECRET="$(OPENBAO_TOKEN_SECRET)" OPERATOR_NAMESPACE="$(OPERATOR_NAMESPACE)" \
 		OPERATOR_DEPLOYMENT="$(PROJECT_NAME)" \
 		./hack/e2e-kind.sh
 	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" TEST_NAMESPACE="$(E2E_TEST_NAMESPACE)" TENANT_B_NAMESPACE="$(E2E_TENANT_B_NAMESPACE)" OPENBAO_NAMESPACE="$(OPENBAO_NAMESPACE)" \
@@ -331,13 +282,6 @@ kind-e2e-resilience: kind-deploy ## Run focused operator recovery scenarios agai
 kind-e2e-resilience-clean: kind ## Remove the retained operator resilience fixture resources.
 	KUBECTL="$(KUBECTL)" KUBE_CONTEXT="kind-$(KIND_CLUSTER)" PERSISTENT_OPENBAO_NAMESPACE="$(PERSISTENT_OPENBAO_NAMESPACE)" PERSISTENT_E2E_NAMESPACE="$(PERSISTENT_E2E_NAMESPACE)" ./hack/cleanup-kind-operator-resilience.sh
 	$(MAKE) HELM_INSTALL_ARGS="" HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" helm-install
-
-.PHONY: kind-refresh
-kind-refresh:
-	$(MAKE) docker-build
-	$(MAKE) kind-load-image
-	$(MAKE) HELM_ARGS="--kube-context=kind-$(KIND_CLUSTER)" deploy
-	$(MAKE) kind-restart
 
 .PHONY: kind-restart
 kind-restart:
@@ -376,10 +320,6 @@ $(CRD_REF_DOCS): $(LOCALBIN)
 
 .PHONY: crd-ref-docs
 crd-ref-docs: $(CRD_REF_DOCS)
-
-KIND_OS ?= linux
-KIND_ARCH ?= $(shell $(GO) env GOARCH)
-KIND_PLATFORM ?= $(KIND_OS)/$(KIND_ARCH)
 
 .PHONY: kind
 kind:

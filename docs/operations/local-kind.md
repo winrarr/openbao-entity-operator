@@ -120,10 +120,14 @@ This removes the local OpenBao data, token Secret, test resources, and operator 
 
 ## Variables
 
+Local Kind, OpenBao fixture, documentation, and tool-version defaults live in
+[`hack/make-config.mk`](../../hack/make-config.mk). Supported values can be
+overridden on the `make` command line without editing that file.
+
 Useful overrides include `KIND_CLUSTER`, `KIND_NODE_IMAGE`,
 `E2E_TEST_NAMESPACE`, `E2E_TENANT_B_NAMESPACE`, `E2E_OUTSIDE_NAMESPACE`,
 `OPENBAO_IMAGE`, `OPENBAO_NAMESPACE`, `OPENBAO_TOKEN_SECRET`,
 `PERSISTENT_OPENBAO_NAMESPACE`, `PERSISTENT_OPENBAO_DEPLOYMENT`,
 `PERSISTENT_OPENBAO_SERVICE`, `PERSISTENT_OPENBAO_TLS_SECRET`,
 `PERSISTENT_E2E_NAMESPACE`, and `CILIUM_VERSION`. The Cilium mode requires
-Helm and uses the pinned Cilium chart version from the root Makefile.
+Helm and uses the pinned Cilium chart version from `hack/make-config.mk`.

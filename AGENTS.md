@@ -40,7 +40,7 @@ This is a Go 1.27 Kubernetes operator for durable entities and API configuration
 ## Canonical commands
 
 ```sh
-make check             # Generate, format-check, vet, test, lint, validate OpenAPI, render samples, build docs
+make check             # Verify generated output, format-check, vet, test, lint, validate OpenAPI, render samples, build docs
 make test              # Focused local unit tests
 make conformance       # Run unit/HTTP contracts and render every sample bundle
 make manifests generate
@@ -71,6 +71,8 @@ make update-openbao-openapi OPENBAO_TOKEN=...  # Refresh from a running OpenBao 
 - `docs/backlog.md` contains real planned outcomes not implemented yet.
 - `docs/verification.md` explains what checks prove and what they do not prove.
 - `docs/operations/local-kind.md` documents the disposable Kind/OpenBao environment.
+- `hack/make-config.mk` contains overridable local workflow settings and pinned
+  Kind/OpenBao/tool defaults used by the root Makefile.
 - `docs/operations/approle.md` documents AppRole setup, credential rotation, and security boundaries.
 - `docs/reference/multi-tenancy.md` documents the current namespace-local trusted-platform model and its limits.
 - `docs/crds/` contains behavior-oriented guides for each public custom resource.
