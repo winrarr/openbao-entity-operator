@@ -58,12 +58,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: ${OPENBAO_TOKEN_SECRET}
-                  key: ${OPENBAO_TOKEN_KEY}
+                  key: token
             - name: BAO_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: ${OPENBAO_TOKEN_SECRET}
-                  key: ${OPENBAO_TOKEN_KEY}
+                  key: token
           ports:
             - name: http
               containerPort: 8200

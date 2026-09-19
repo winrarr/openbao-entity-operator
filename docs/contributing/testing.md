@@ -4,7 +4,7 @@ The repository has three verification layers with deliberately different jobs:
 
 - `make test` runs unit, fake-client reconciliation, and HTTP contract tests without external services. This is where almost all controller logic belongs: creation and adoption policy, drift, status, finalizers, dependency failures, and error handling.
 - `make samples-check` renders every checked-in sample bundle, and `make conformance` combines that check with the full local test suite.
-- `make check` adds generation, formatting, vet, lint, Helm chart lint/rendering, OpenAPI validation, sample rendering, and strict docs validation.
+- `make check` verifies generated output, formatting, vet, lint, Helm chart lint/rendering, OpenAPI validation, sample rendering, and strict docs validation.
 - `make kind-e2e` runs a focused live smoke/integration path in an isolated Kind cluster: scoped Helm installation, CRDs/RBAC, a negative watch-scope check, Kubernetes Auth, AppRole, and one successful policy/entity/alias/group-membership graph.
 
 The live script is intentionally not a second controller test suite. Add a new

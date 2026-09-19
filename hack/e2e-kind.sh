@@ -6,7 +6,6 @@ KUBE_CONTEXT=${KUBE_CONTEXT:-kind-openbao-entity-operator}
 OPENBAO_NAMESPACE=${OPENBAO_NAMESPACE:-openbao}
 OPENBAO_DEPLOYMENT=${OPENBAO_DEPLOYMENT:-openbao}
 OPENBAO_TOKEN_SECRET=${OPENBAO_TOKEN_SECRET:-openbao-dev-token}
-OPENBAO_TOKEN_KEY=${OPENBAO_TOKEN_KEY:-token}
 TEST_NAMESPACE=${TEST_NAMESPACE:-openbao-entity-operator-e2e}
 TENANT_B_NAMESPACE=${TENANT_B_NAMESPACE:-openbao-entity-operator-e2e-b}
 OUTSIDE_NAMESPACE=${OUTSIDE_NAMESPACE:-openbao-entity-operator-outside}
@@ -376,7 +375,7 @@ spec:
   address: http://openbao.${OPENBAO_NAMESPACE}.svc.cluster.local:8200
   tokenSecretRef:
     name: ${CLEANUP_TOKEN_SECRET}
-    key: ${OPENBAO_TOKEN_KEY}
+    key: token
 EOF
 wait_ready openbaoconnection/e2e-cleanup-token
 
