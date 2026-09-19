@@ -4,9 +4,6 @@ Use the repository Makefile as the canonical interface:
 
 ```sh
 make check
-make build
-make helm-lint helm-template
-make helm-package
 make kind-e2e
 make kind-down
 ```

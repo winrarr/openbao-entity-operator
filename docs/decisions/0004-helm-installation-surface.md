@@ -5,22 +5,21 @@
 
 ## Decision
 
-Support the operator Helm chart as the configurable installation surface while
-retaining the generated Kustomize bundle for standalone manifest workflows.
-Helm packages CRDs from `config/crd/bases/` and wraps generated manager RBAC
-permissions with chart-owned names, labels, and bindings.
+Support the operator Helm chart as the installation surface. Helm packages
+CRDs from `config/crd/bases/` and wraps generated manager RBAC permissions with
+chart-owned names, labels, and bindings.
 
 ## Rationale
 
 The operator needs explicit configuration for image references, metrics,
 security settings, and installation namespace. Helm provides those values and
 release lifecycle semantics without changing the Kubernetes API or controller
-behavior. Keeping Kustomize available preserves a useful dependency-light
-manifest output for platforms that do not use Helm.
+behavior. Kustomize remains an internal Kubebuilder and sample-rendering tool,
+not a supported installation interface.
 
 ## Consequences
 
 - `make manifests` synchronizes generated CRDs and manager permissions into the chart.
 - `make verify-generated`, `make helm-lint`, and `make helm-template` protect the chart in local and CI checks.
 - `make deploy` and the live Kind workflow install the Helm release.
-- CRD lifecycle remains explicit: Helm installs CRDs, while `make uninstall` remains the Kustomize CRD removal workflow.
+- The release workflow packages and publishes the chart with the Helm CLI.

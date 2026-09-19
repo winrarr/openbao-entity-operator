@@ -13,9 +13,7 @@
 | `make conformance` | Runs the full unit/HTTP contract suite and validates all sample bundles | Does not exercise a live Kubernetes API server or OpenBao |
 | `make lint-config lint` | Linter configuration and source checks pass | Linter findings are not a substitute for runtime tests |
 | `make openapi-check` | The checked-in OpenBao reference is valid and contains the selected durable OpenBao API families used here | The reference is version-specific and dynamic |
-| `make kustomize-build` | The default installation manifests render | Does not apply them to a cluster |
 | `make helm-lint helm-template` | The Helm chart values validate and the chart renders | Does not install the chart |
-| `make helm-package` | Packages the validated Helm chart, including committed CRDs, into `dist/` | Does not publish the package |
 | `make docs-build` | The generated CRD reference is current and the documentation site passes strict validation | Does not publish the site locally |
 | `make check` | Runs the complete local foundation suite | Does not start external services |
 | `make kind-e2e` | Installs the operator from the Helm chart with a namespace scope, verifies scoped CRD/RBAC presence and an ignored resource outside the scope, authenticates through real OpenBao Kubernetes Auth, AppRole, and token connections, exercises one live policy/Kubernetes Auth role/entity/alias/group-membership graph including bound and unbound workload login, verifies two-tenant role isolation, and proves Delete-policy cleanup resumes after credential loss | Uses a single in-memory OpenBao dev server; controller branches such as adoption, drift, conflicts, and most deletion behavior remain covered by unit and HTTP contract tests |

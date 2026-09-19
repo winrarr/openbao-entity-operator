@@ -41,14 +41,6 @@ helm upgrade --install openbao-entity-operator \
   --create-namespace
 ```
 
-The generated Kustomize bundle remains available for workflows that prefer a
-standalone manifest:
-
-```sh
-make build-installer
-kubectl apply -f dist/install.yaml
-```
-
 ## Useful chart settings
 
 The chart exposes settings for:

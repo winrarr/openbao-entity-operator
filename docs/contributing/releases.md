@@ -6,17 +6,17 @@ and operator image use the same stable version for the initial release line:
 - `charts/openbao-entity-operator/Chart.yaml:version` selects the chart package;
 - `charts/openbao-entity-operator/Chart.yaml:appVersion` selects the operator image.
 
-## Package locally
-
-Validate and package the chart into `dist/` with:
+The `Publish Release` workflow validates and packages the chart with the Helm
+CLI. Run `make verify-generated` before publishing when changing API types or
+RBAC markers. A local dry run, when needed, is simply:
 
 ```sh
-make helm-package
+mkdir -p dist
+helm lint charts/openbao-entity-operator
+helm package charts/openbao-entity-operator --destination dist
 ```
 
 The package includes the CRDs under `charts/openbao-entity-operator/crds/`.
-Run `make verify-generated` before packaging when changing API types or RBAC
-markers.
 
 ## Release tags
 
