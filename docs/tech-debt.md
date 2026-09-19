@@ -54,3 +54,20 @@ the Kind workflow covers the live credential-loss path.
 
 The accepted recovery trade-off is that a resource can remain `Terminating`
 until the platform restores access. See [Decision 0008](decisions/0008-deletion-finalizer-retention.md).
+
+## TD-005: Broad controller coverage is representative, not exhaustive
+
+Status: addressed as the accepted v0.2 test boundary
+
+The operator has more resource kinds than can be usefully exercised by a
+small live test suite. The repository now centralizes shared lifecycle
+conformance tests, covers all OIDC adapters through a table-driven fixture,
+checks specialized normalization and identity invariants, and renders grouped
+samples. Individual endpoint behavior remains covered by typed HTTP contract
+tests; Kind remains focused on installation and external wiring.
+
+Exit criteria: retain the `make conformance` and `make samples-check` targets,
+add focused unit or HTTP coverage when a new endpoint or lifecycle rule is
+introduced, and add a live scenario only when fake clients cannot observe the
+behavior. Do not convert this register entry into a requirement for one E2E
+scenario per CRD.

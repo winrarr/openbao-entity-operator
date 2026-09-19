@@ -1,0 +1,83 @@
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoOIDCConfig
+metadata:
+  name: issuer
+spec:
+  connectionRef:
+    name: openbao
+  issuer: https://openbao.example.com:8200
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoOIDCProvider
+metadata:
+  name: default
+spec:
+  connectionRef:
+    name: openbao
+  issuer: https://openbao.example.com:8200
+  allowedClientIDs:
+    - payments
+  scopesSupported:
+    - openid
+    - profile
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoOIDCClient
+metadata:
+  name: payments
+spec:
+  connectionRef:
+    name: openbao
+  clientType: confidential
+  key: payments-signing
+  redirectURIs:
+    - https://payments.example.com/callback
+  assignments:
+    - payments-assignment
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoOIDCKey
+metadata:
+  name: payments-signing
+spec:
+  connectionRef:
+    name: openbao
+  algorithm: RS256
+  allowedClientIDs:
+    - payments
+  rotationPeriod: 720h
+  verificationTTL: 24h
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoOIDCRole
+metadata:
+  name: payments
+spec:
+  connectionRef:
+    name: openbao
+  key: payments-signing
+  clientID: payments
+  template: '{"sub":"{{identity.entity.id}}"}'
+  ttl: 1h
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoOIDCScope
+metadata:
+  name: payments
+spec:
+  connectionRef:
+    name: openbao
+  description: Payments identity claims
+  template: '{"team":"payments"}'
+---
+apiVersion: openbao.openbao-operator.io/v1alpha1
+kind: OpenBaoOIDCAssignment
+metadata:
+  name: payments-assignment
+spec:
+  connectionRef:
+    name: openbao
+  entityIDs:
+    - entity-id-from-openbao
+  groupIDs:
+    - group-id-from-openbao

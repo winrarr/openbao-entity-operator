@@ -34,8 +34,9 @@ authorization boundaries.
   levels, global rate-limit settings, and automatic rotation configuration.
 - Create, adopt, update, observe, drift-correct, orphan, and opt-in delete
   behavior where the OpenBao endpoint represents a durable named object.
-- Helm and generated Kustomize installation surfaces for the controller and
-  CRDs, with optional namespace-scoped installations.
+- Helm installation for the controller and CRDs, with optional
+  namespace-scoped installations. Kustomize remains an internal tool for
+  sample rendering and generated artifacts.
 - A latest-stable OpenBao support policy, currently OpenBao v2.6.2.
 
 ## Boundary with OpenBao deployment

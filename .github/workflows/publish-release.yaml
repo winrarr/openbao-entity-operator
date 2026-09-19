@@ -118,7 +118,11 @@ jobs:
           fi
 
       - name: Package chart
-        run: make helm-package CHART_PACKAGE_DIR=dist
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          helm lint charts/openbao-entity-operator
+          helm package charts/openbao-entity-operator --destination dist
 
       - name: Push chart
         if: env.DRY_RUN != 'true' && steps.chart_exists.outputs.exists != 'true'

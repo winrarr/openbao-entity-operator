@@ -29,7 +29,12 @@ import (
 	"github.com/rkthtrifork/openbao-entity-operator/internal/openbaoclient"
 )
 
-const testLoggerLevel = "debug"
+const (
+	testLoggerLevel        = "debug"
+	testLoggerInfoLevel    = "info"
+	testLoggerName         = "audit"
+	testLoggerResourceName = "audit-logger"
+)
 
 func TestAuthMethodReconcilerCreatesMountAndIsIdempotent(t *testing.T) {
 	connection := readyConnection()
@@ -81,7 +86,7 @@ func TestNamespaceReconcilerWritesMetadata(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "platform", Namespace: testNamespace},
 		Spec: openbaov1alpha1.OpenBaoNamespaceSpec{
 			ConnectionRef: connectionReference(connection), Path: "teams/platform",
-			CustomMetadata: map[string]string{"team": "platform"},
+			CustomMetadata: map[string]string{testMetadataKey: "platform"},
 		},
 	}
 	kubeClient := newTestClient(connection, namespace)
@@ -108,10 +113,10 @@ func TestNamespaceReconcilerWritesMetadata(t *testing.T) {
 func TestLoggerReconcilerCreatesAndCorrectsLevel(t *testing.T) {
 	connection := readyConnection()
 	logger := &openbaov1alpha1.OpenBaoLogger{
-		ObjectMeta: metav1.ObjectMeta{Name: "audit-logger", Namespace: testNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: testLoggerResourceName, Namespace: testNamespace},
 		Spec: openbaov1alpha1.OpenBaoLoggerSpec{
 			ConnectionRef: connectionReference(connection),
-			Name:          "audit",
+			Name:          testLoggerName,
 			Level:         testLoggerLevel,
 		},
 	}
@@ -127,7 +132,7 @@ func TestLoggerReconcilerCreatesAndCorrectsLevel(t *testing.T) {
 	if _, err := reconciler.Reconcile(context.Background(), request); err != nil {
 		t.Fatal(err)
 	}
-	if baoClient.loggerWriteCalls != 1 || baoClient.loggers["audit"]["level"] != testLoggerLevel {
+	if baoClient.loggerWriteCalls != 1 || baoClient.loggers[testLoggerName]["level"] != testLoggerLevel {
 		t.Fatalf("logger writes = %d, loggers = %#v, want one debug write", baoClient.loggerWriteCalls, baoClient.loggers)
 	}
 	var got openbaov1alpha1.OpenBaoLogger
@@ -156,6 +161,7 @@ type fakeSystemClient struct {
 	authEnableCalls     int
 	namespaceWriteCalls int
 	loggerWriteCalls    int
+	loggerDeleteCalls   int
 }
 
 func (f *fakeSystemClient) GetMFALoginEnforcement(context.Context, string) (openbaoclient.AdditionalObject, error) {
@@ -209,6 +215,7 @@ func (f *fakeSystemClient) WriteLogger(_ context.Context, name string, value ope
 	return nil
 }
 func (f *fakeSystemClient) DeleteLogger(_ context.Context, name string) error {
+	f.loggerDeleteCalls++
 	delete(f.loggers, name)
 	return nil
 }

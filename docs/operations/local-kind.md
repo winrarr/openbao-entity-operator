@@ -16,7 +16,7 @@ The target builds the operator image, installs the committed Helm chart, and the
 - generates a local-only root token into a Kubernetes Secret, without writing it to the checkout or printing it;
 - configures OpenBao Kubernetes Auth for the operator ServiceAccount and gives that role only the identity, ACL policy, Kubernetes Auth role, and token lifecycle permissions needed by the test;
 - builds and loads the operator image;
-- installs the generated CRDs and operator Helm chart;
+- installs the operator Helm chart, including the generated CRDs;
 - verifies CRD installation, namespace-scoped manager RoleBindings, and that a
   valid connection outside the configured watch namespace is not reconciled;
 - configures OpenBao Kubernetes Auth and verifies a real projected ServiceAccount login;
